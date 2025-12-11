@@ -1,0 +1,89 @@
+{
+  "name": "EDulearn - SmartLearn MVP",
+  "type": "frontend",
+  "framework": "react",
+  "testEnvironment": "browser",
+  "baseUrl": "http://localhost:8080",
+  "routes": [
+    "/",
+    "/auth",
+    "/dashboard",
+    "/courses",
+    "/library",
+    "/profile"
+  ],
+  "authentication": {
+    "type": "supabase",
+    "endpoint": "/auth"
+  },
+  "testScenarios": [
+    {
+      "name": "Landing Page",
+      "path": "/",
+      "checks": [
+        "Page loads successfully",
+        "Navigation links work",
+        "Hero section displays correctly",
+        "Feature cards render properly"
+      ]
+    },
+    {
+      "name": "Authentication",
+      "path": "/auth",
+      "checks": [
+        "Login form displays",
+        "Registration form works",
+        "Form validation works",
+        "Authentication flow completes"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "requiresAuth": true,
+      "checks": [
+        "Dashboard loads for authenticated users",
+        "Role-based dashboards display correctly",
+        "Navigation works",
+        "User data displays"
+      ]
+    },
+    {
+      "name": "Courses",
+      "path": "/courses",
+      "checks": [
+        "Course list displays",
+        "Course filtering works",
+        "Course detail pages load",
+        "Enrollment process works"
+      ]
+    },
+    {
+      "name": "Library",
+      "path": "/library",
+      "checks": [
+        "Library content displays",
+        "Search functionality works",
+        "File upload works",
+        "Video/PDF viewers function"
+      ]
+    }
+  ],
+  "components": {
+    "test": true,
+    "coverage": {
+      "include": [
+        "src/components/**/*",
+        "src/pages/**/*",
+        "src/lib/**/*"
+      ]
+    }
+  },
+  "integration": {
+    "supabase": {
+      "url": "${VITE_SUPABASE_URL}",
+      "key": "${VITE_SUPABASE_PUBLISHABLE_KEY}"
+    }
+  }
+}
+

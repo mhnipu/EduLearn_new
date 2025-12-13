@@ -401,9 +401,14 @@ export default function CourseWizard() {
       }
 
       return id;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving course:', error);
-      toast({ title: 'Error saving course', variant: 'destructive' });
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast({ 
+        title: 'Error saving course', 
+        description: errorMessage,
+        variant: 'destructive' 
+      });
       return null;
     } finally {
       setSaving(false);

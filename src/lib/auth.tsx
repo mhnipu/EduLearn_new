@@ -21,7 +21,8 @@ interface AuthContextType {
   permissions: ModulePermission[];
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+  signInWithPhone: (phone: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   hasPermission: (moduleName: string, permission: 'create' | 'read' | 'update' | 'delete') => boolean;
   hasRole: (checkRole: AppRole) => boolean;
@@ -121,6 +122,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔐 Auth Event:', event, 'Session:', session ? 'Active' : 'None');
+        console.log('📡 Using Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -141,10 +145,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('🔍 Checking existing session...');
+      console.log('📡 Connected to Supabase:', import.meta.env.VITE_SUPABASE_URL);
+
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        console.log('✅ User authenticated:', session.user.email);
         await Promise.all([
           fetchUserRoles(session.user.id),
           fetchUserPermissions(session.user.id),
@@ -157,36 +165,106 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    console.log('🔑 Signing in with email to external Supabase...');
+    console.log('📡 Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+
+    // Regular Supabase authentication (must be real session to access DB under RLS)
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
+    if (!error) {
+      console.log('✅ Successfully signed in to external Supabase');
+
+      // Bootstrap: if the default super admin logs in, ensure they have super_admin role in DB
+      const normalizedEmail = email.trim().toLowerCase();
+      if (normalizedEmail === 'super@gmail.com') {
+        console.log('👑 Attempting to bootstrap super_admin role for super@gmail.com...');
+        const { error: rpcError } = await supabase.rpc('bootstrap_super_admin');
+        if (rpcError) {
+          console.warn('⚠️ bootstrap_super_admin failed:', rpcError.message);
+        } else {
+          console.log('✅ bootstrap_super_admin succeeded');
+          // Refresh role/permissions after bootstrap
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session?.user) {
+            await Promise.all([
+              fetchUserRoles(sessionData.session.user.id),
+              fetchUserPermissions(sessionData.session.user.id),
+            ]);
+          }
+        }
+      }
+    } else {
+      console.error('❌ Sign in failed:', error.message);
+    }
+    
     return { error };
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signInWithPhone = async (phone: string, password: string) => {
+    console.log('🔑 Signing in with phone to external Supabase...');
+    console.log('📡 Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      phone,
+      password,
+    });
+    
+    if (!error) {
+      console.log('✅ Successfully signed in with phone to external Supabase');
+    } else {
+      console.error('❌ Phone sign in failed:', error.message);
+    }
+    
+    return { error };
+  };
+
+  const signUp = async (email: string, password: string, fullName: string, phone?: string) => {
+    console.log('📝 Creating new user in external Supabase...');
+    console.log('📡 Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+    console.log('📧 Email:', email);
+    console.log('📱 Phone:', phone || 'Not provided');
+    
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    // IMPORTANT: Don't pass 'phone' at top level with email auth
+    // Phone should only be in options.data for metadata
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
+      // phone: phone,  ❌ REMOVED - This conflicts with email auth!
       options: {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
+          phone: phone || '',
         },
       },
     });
+    
+    if (!error) {
+      console.log('✅ User created successfully in external Supabase!');
+      console.log('👤 User ID:', data.user?.id);
+      console.log('📊 Database trigger will create profile automatically');
+    } else {
+      console.error('❌ Signup failed:', error.message);
+    }
+    
     return { error };
   };
 
   const signOut = async () => {
+    console.log('🚪 Signing out from external Supabase...');
     await supabase.auth.signOut();
+    
     setUser(null);
     setSession(null);
     setRole(null);
     setRoles([]);
     setPermissions([]);
+    console.log('✅ Signed out successfully');
   };
 
   const hasPermission = (moduleName: string, permission: 'create' | 'read' | 'update' | 'delete'): boolean => {
@@ -219,6 +297,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       permissions, 
       loading, 
       signIn, 
+      signInWithPhone,
       signUp, 
       signOut, 
       hasPermission, 

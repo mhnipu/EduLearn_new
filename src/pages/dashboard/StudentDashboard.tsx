@@ -77,7 +77,52 @@ const StudentDashboard = () => {
         .eq('user_id', user?.id)
         .order('enrolled_at', { ascending: false });
 
-      setEnrolledCourses(enrollments || []);
+      // Calculate actual progress for each course
+      if (enrollments && user) {
+        const coursesWithProgress = await Promise.all(
+          enrollments.map(async (enrollment) => {
+            // Get total lessons and materials for this course
+            const [lessonsResult, materialsResult] = await Promise.all([
+              supabase
+                .from('lessons')
+                .select('id', { count: 'exact', head: true })
+                .eq('course_id', enrollment.course_id),
+              supabase
+                .from('course_materials')
+                .select('id', { count: 'exact', head: true })
+                .eq('course_id', enrollment.course_id),
+            ]);
+
+            const totalItems = (lessonsResult.count || 0) + (materialsResult.count || 0);
+
+            // Get completed items
+            const { count: completedCount } = await supabase
+              .from('learning_progress')
+              .select('*', { count: 'exact', head: true })
+              .eq('student_id', user.id)
+              .eq('completed', true)
+              .in('content_id', [
+                ...(lessonsResult.data?.map(l => l.id) || []),
+                ...(materialsResult.data?.map(m => m.id) || []),
+              ]);
+
+            const progress = totalItems > 0 
+              ? Math.round(((completedCount || 0) / totalItems) * 100)
+              : 0;
+
+            return {
+              ...enrollment,
+              progress: Math.min(progress, 100),
+              totalItems,
+              completedItems: completedCount || 0,
+            };
+          })
+        );
+
+        setEnrolledCourses(coursesWithProgress);
+      } else {
+        setEnrolledCourses(enrollments || []);
+      }
 
       // Fetch bookmarks
       const { data: bookmarksData } = await supabase
@@ -489,12 +534,29 @@ const StudentDashboard = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between text-xs text-muted-foreground">
                           <span>Progress</span>
-                          <span>{enrollment.completed_at ? '100%' : '45%'}</span>
+                          <span>
+                            {enrollment.completed_at 
+                              ? '100%' 
+                              : (enrollment as any).progress !== undefined 
+                                ? `${(enrollment as any).progress}%`
+                                : '0%'}
+                          </span>
                         </div>
                         <Progress 
-                          value={enrollment.completed_at ? 100 : 45} 
+                          value={
+                            enrollment.completed_at 
+                              ? 100 
+                              : (enrollment as any).progress !== undefined 
+                                ? (enrollment as any).progress 
+                                : 0
+                          } 
                           className="h-2"
                         />
+                        {(enrollment as any).totalItems !== undefined && (
+                          <p className="text-xs text-muted-foreground">
+                            {(enrollment as any).completedItems || 0} of {(enrollment as any).totalItems || 0} lessons completed
+                          </p>
+                        )}
                       </div>
 
                       <Button

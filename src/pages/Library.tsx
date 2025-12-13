@@ -7,9 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Video, Search, Upload, Download, Eye, Bookmark, Clock, Play, FileText } from 'lucide-react';
+import { BookOpen, Video, Search, Upload, Download, Eye, Bookmark, Clock, Play, FileText, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { EditBookDialog } from '@/components/library/EditBookDialog';
+import { EditVideoDialog } from '@/components/library/EditVideoDialog';
+import { VideoPlayerModal } from '@/components/library/VideoPlayerModal';
 
 interface Category {
   id: string;
@@ -20,26 +23,29 @@ interface Category {
 interface Book {
   id: string;
   title: string;
-  description: string;
-  author: string;
+  description: string | null;
+  author: string | null;
   thumbnail_url: string | null;
-  category_id: string;
-  tags: string[];
+  category_id: string | null;
+  tags: string[] | null;
   download_count: number;
   view_count: number;
-  file_size_mb: number;
+  file_size_mb: number | null;
+  page_count: number | null;
+  is_active: boolean;
 }
 
 interface VideoItem {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   youtube_url: string;
   thumbnail_url: string | null;
-  category_id: string;
-  tags: string[];
+  category_id: string | null;
+  tags: string[] | null;
   view_count: number;
-  duration_minutes: number;
+  duration_minutes: number | null;
+  is_active: boolean;
 }
 
 import { detectVideoType, getVideoThumbnail } from '@/components/library/VideoPlayer';
@@ -54,6 +60,12 @@ export default function Library() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
+  const [isEditBookOpen, setIsEditBookOpen] = useState(false);
+  const [isEditVideoOpen, setIsEditVideoOpen] = useState(false);
+  const [playingVideo, setPlayingVideo] = useState<VideoItem | null>(null);
+  const [isVideoPlayerOpen, setIsVideoPlayerOpen] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -74,47 +86,171 @@ export default function Library() {
 
   const fetchBooks = async () => {
     setLoading(true);
-    let query = supabase
-      .from('books')
-      .select('*')
-      .eq('is_active', true);
-
-    if (selectedCategory !== 'all') {
-      query = query.eq('category_id', selectedCategory);
-    }
-
-    if (searchQuery) {
-      query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
     
-    if (!error && data) {
-      setBooks(data);
+    // For students, show only books assigned to their enrolled courses
+    if (role === 'student' && user) {
+      // Get enrolled courses
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('course_id')
+        .eq('user_id', user.id);
+      
+      if (enrollments && enrollments.length > 0) {
+        const courseIds = enrollments.map(e => e.course_id);
+        
+        // Get books assigned to enrolled courses
+        const { data: bookLinks } = await supabase
+          .from('course_library_books')
+          .select('book_id')
+          .in('course_id', courseIds);
+        
+        if (bookLinks && bookLinks.length > 0) {
+          const bookIds = bookLinks.map(l => l.book_id);
+          console.log('📚 Student: Fetching books from enrolled courses. Book IDs:', bookIds);
+          
+          let query = supabase
+            .from('books')
+            .select('*')
+            .eq('is_active', true)
+            .in('id', bookIds);
+          
+          if (selectedCategory !== 'all') {
+            query = query.eq('category_id', selectedCategory);
+          }
+          
+          if (searchQuery) {
+            query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+          }
+          
+          const { data, error } = await query.order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('❌ Error fetching books for student:', error);
+            console.error('Error details:', {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint
+            });
+            setBooks([]);
+          } else {
+            console.log('✅ Student: Fetched books:', data?.length || 0);
+            setBooks(data || []);
+          }
+        } else {
+          console.log('ℹ️ Student: No book links found for enrolled courses');
+          setBooks([]);
+        }
+      } else {
+        setBooks([]);
+      }
+    } else {
+      // For admins/teachers, show all books
+      let query = supabase
+        .from('books')
+        .select('*')
+        .eq('is_active', true);
+
+      if (selectedCategory !== 'all') {
+        query = query.eq('category_id', selectedCategory);
+      }
+
+      if (searchQuery) {
+        query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setBooks(data);
+      }
     }
+    
     setLoading(false);
   };
 
   const fetchVideos = async () => {
     setLoading(true);
-    let query = supabase
-      .from('videos')
-      .select('*')
-      .eq('is_active', true);
-
-    if (selectedCategory !== 'all') {
-      query = query.eq('category_id', selectedCategory);
-    }
-
-    if (searchQuery) {
-      query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
     
-    if (!error && data) {
-      setVideos(data);
+    // For students, show only videos assigned to their enrolled courses
+    if (role === 'student' && user) {
+      // Get enrolled courses
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('course_id')
+        .eq('user_id', user.id);
+      
+      if (enrollments && enrollments.length > 0) {
+        const courseIds = enrollments.map(e => e.course_id);
+        
+        // Get videos assigned to enrolled courses
+        const { data: videoLinks } = await supabase
+          .from('course_library_videos')
+          .select('video_id')
+          .in('course_id', courseIds);
+        
+        if (videoLinks && videoLinks.length > 0) {
+          const videoIds = videoLinks.map(l => l.video_id);
+          console.log('🎥 Student: Fetching videos from enrolled courses. Video IDs:', videoIds);
+          
+          let query = supabase
+            .from('videos')
+            .select('*')
+            .eq('is_active', true)
+            .in('id', videoIds);
+          
+          if (selectedCategory !== 'all') {
+            query = query.eq('category_id', selectedCategory);
+          }
+          
+          if (searchQuery) {
+            query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+          }
+          
+          const { data, error } = await query.order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('❌ Error fetching videos for student:', error);
+            console.error('Error details:', {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint
+            });
+            setVideos([]);
+          } else {
+            console.log('✅ Student: Fetched videos:', data?.length || 0);
+            setVideos(data || []);
+          }
+        } else {
+          console.log('ℹ️ Student: No video links found for enrolled courses');
+          setVideos([]);
+        }
+      } else {
+        setVideos([]);
+      }
+    } else {
+      // For admins/teachers, show all videos
+      let query = supabase
+        .from('videos')
+        .select('*')
+        .eq('is_active', true);
+
+      if (selectedCategory !== 'all') {
+        query = query.eq('category_id', selectedCategory);
+      }
+
+      if (searchQuery) {
+        query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setVideos(data);
+      }
     }
+    
     setLoading(false);
   };
 
@@ -150,7 +286,11 @@ export default function Library() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-4xl font-bold mb-2">Smart E-Library</h1>
-          <p className="text-muted-foreground">Explore books, videos, and learning materials</p>
+          <p className="text-muted-foreground">
+            {role === 'student' 
+              ? 'Access books and videos from your enrolled courses'
+              : 'Explore books, videos, and learning materials'}
+          </p>
         </div>
         {canUpload && (
           <Button onClick={() => navigate('/library/upload')}>
@@ -269,6 +409,21 @@ export default function Library() {
                     >
                       View
                     </Button>
+                    {canUpload && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBook(book);
+                          setIsEditBookOpen(true);
+                        }}
+                        title="Edit book"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="icon"
@@ -301,7 +456,13 @@ export default function Library() {
                 return (
                   <Card key={video.id} className="hover:shadow-lg transition-shadow group">
                     <CardHeader className="pb-3">
-                      <div className="aspect-video mb-4 rounded-md overflow-hidden bg-muted relative">
+                      <div 
+                        className="aspect-video mb-4 rounded-md overflow-hidden bg-muted relative cursor-pointer"
+                        onClick={() => {
+                          setPlayingVideo(video);
+                          setIsVideoPlayerOpen(true);
+                        }}
+                      >
                         {thumbnailUrl ? (
                           <>
                             <img 
@@ -312,8 +473,8 @@ export default function Library() {
                                 e.currentTarget.style.display = 'none';
                               }}
                             />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <div className="w-12 h-12 rounded-full bg-primary/90 flex items-center justify-center">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              <div className="w-12 h-12 rounded-full bg-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <Play className="h-6 w-6 text-primary-foreground ml-1" />
                               </div>
                             </div>
@@ -357,12 +518,30 @@ export default function Library() {
                     </CardContent>
                     <CardFooter className="flex gap-2 pt-0">
                       <Button 
-                        onClick={() => navigate(`/library/video/${video.id}`)}
+                        onClick={() => {
+                          setPlayingVideo(video);
+                          setIsVideoPlayerOpen(true);
+                        }}
                         className="flex-1"
                         size="sm"
                       >
                         Watch
                       </Button>
+                      {canUpload && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedVideo(video);
+                            setIsEditVideoOpen(true);
+                          }}
+                          title="Edit video"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="icon"
@@ -379,6 +558,41 @@ export default function Library() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Edit Dialogs */}
+      <EditBookDialog
+        book={selectedBook}
+        isOpen={isEditBookOpen}
+        onClose={() => {
+          setIsEditBookOpen(false);
+          setSelectedBook(null);
+        }}
+        onSuccess={() => {
+          fetchBooks();
+        }}
+      />
+
+      <EditVideoDialog
+        video={selectedVideo}
+        isOpen={isEditVideoOpen}
+        onClose={() => {
+          setIsEditVideoOpen(false);
+          setSelectedVideo(null);
+        }}
+        onSuccess={() => {
+          fetchVideos();
+        }}
+      />
+
+      {/* Video Player Modal */}
+      <VideoPlayerModal
+        video={playingVideo}
+        isOpen={isVideoPlayerOpen}
+        onClose={() => {
+          setIsVideoPlayerOpen(false);
+          setPlayingVideo(null);
+        }}
+      />
     </div>
   );
 }

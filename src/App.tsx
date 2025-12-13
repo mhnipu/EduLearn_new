@@ -35,6 +35,7 @@ import CourseModules from "./pages/admin/CourseModules";
 import CourseWizard from "./pages/admin/CourseWizard";
 import AssignmentManagement from "./pages/admin/AssignmentManagement";
 import AssignmentSubmissions from "./pages/admin/AssignmentSubmissions";
+import SiteContent from "./pages/admin/SiteContent";
 import StudentAssignments from "./pages/student/StudentAssignments";
 import NotFound from "./pages/NotFound";
 
@@ -72,6 +73,7 @@ const App = () => (
               <Route path="/admin/content-assignments" element={<ContentAssignments />} />
               <Route path="/admin/categories" element={<CategoryManagement />} />
               <Route path="/admin/super" element={<SuperAdminManagement />} />
+              <Route path="/admin/site-content" element={<SiteContent />} />
               <Route path="/admin/system-monitoring" element={<SystemMonitoring />} />
               <Route path="/admin/enrollments" element={<EnrollmentManagement />} />
               <Route path="/admin/courses/:courseId/modules" element={<CourseModules />} />

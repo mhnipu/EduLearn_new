@@ -35,12 +35,20 @@ interface WaitlistInfo {
   status: string | null;
 }
 
+interface Module {
+  id: string;
+  title: string;
+  description: string | null;
+  order_index: number | null;
+}
+
 interface Lesson {
   id: string;
   title: string;
   video_url: string | null;
   pdf_url: string | null;
   order_index: number;
+  module_id: string | null;
 }
 
 interface CourseMaterial {
@@ -74,6 +82,7 @@ export default function CourseDetail() {
   const { toast } = useToast();
   
   const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [selectedItem, setSelectedItem] = useState<Lesson | CourseMaterial | null>(null);
@@ -149,6 +158,16 @@ export default function CourseDetail() {
       }
     }
 
+    // Fetch modules
+    const { data: modulesData } = await supabase
+      .from('course_modules')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true });
+
+    setModules(modulesData || []);
+
+    // Fetch lessons (with module_id)
     const { data: lessonsData } = await supabase
       .from('lessons')
       .select('*')
@@ -551,6 +570,7 @@ export default function CourseDetail() {
 
               <TabsContent value="curriculum">
                 <CourseCurriculum
+                  modules={modules}
                   lessons={lessons}
                   materials={materials}
                   selectedItem={selectedItem}

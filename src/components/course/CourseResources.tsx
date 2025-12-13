@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   BookOpen, Video, Download, ExternalLink, FileText, 
-  Clock, Eye, Library
+  Clock, Eye, Library, Lock
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,40 +42,89 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
 
   const fetchResources = async () => {
     setLoading(true);
+    try {
+      // Fetch course library books
+      const { data: bookLinks, error: bookLinksError } = await supabase
+        .from('course_library_books')
+        .select('book_id')
+        .eq('course_id', courseId);
 
-    // Fetch course library books
-    const { data: bookLinks } = await supabase
-      .from('course_library_books')
-      .select('book_id')
-      .eq('course_id', courseId);
+      if (bookLinksError) {
+        console.error('Error fetching course library books:', bookLinksError);
+      }
 
-    if (bookLinks && bookLinks.length > 0) {
-      const bookIds = bookLinks.map(l => l.book_id);
-      const { data: booksData } = await supabase
-        .from('books')
-        .select('id, title, author, thumbnail_url, pdf_url, page_count')
-        .in('id', bookIds);
-      
-      setBooks(booksData || []);
+      if (bookLinks && bookLinks.length > 0) {
+        const bookIds = bookLinks.map(l => l.book_id);
+        console.log('📚 Fetching books for course:', courseId, 'Book IDs:', bookIds);
+        
+        const { data: booksData, error: booksError } = await supabase
+          .from('books')
+          .select('id, title, author, thumbnail_url, pdf_url, page_count, is_active')
+          .in('id', bookIds)
+          .eq('is_active', true);
+        
+        if (booksError) {
+          console.error('❌ Error fetching books:', booksError);
+          console.error('Error details:', {
+            message: booksError.message,
+            code: booksError.code,
+            details: booksError.details,
+            hint: booksError.hint
+          });
+          // Still set empty array to show "no resources" message
+          setBooks([]);
+        } else {
+          console.log('✅ Fetched books:', booksData?.length || 0);
+          setBooks(booksData || []);
+        }
+      } else {
+        console.log('ℹ️ No book links found for course:', courseId);
+        setBooks([]);
+      }
+
+      // Fetch course library videos
+      const { data: videoLinks, error: videoLinksError } = await supabase
+        .from('course_library_videos')
+        .select('video_id')
+        .eq('course_id', courseId);
+
+      if (videoLinksError) {
+        console.error('Error fetching course library videos:', videoLinksError);
+      }
+
+      if (videoLinks && videoLinks.length > 0) {
+        const videoIds = videoLinks.map(l => l.video_id);
+        console.log('🎥 Fetching videos for course:', courseId, 'Video IDs:', videoIds);
+        
+        const { data: videosData, error: videosError } = await supabase
+          .from('videos')
+          .select('id, title, thumbnail_url, youtube_url, duration_minutes, is_active')
+          .in('id', videoIds)
+          .eq('is_active', true);
+        
+        if (videosError) {
+          console.error('❌ Error fetching videos:', videosError);
+          console.error('Error details:', {
+            message: videosError.message,
+            code: videosError.code,
+            details: videosError.details,
+            hint: videosError.hint
+          });
+          // Still set empty array to show "no resources" message
+          setVideos([]);
+        } else {
+          console.log('✅ Fetched videos:', videosData?.length || 0);
+          setVideos(videosData || []);
+        }
+      } else {
+        console.log('ℹ️ No video links found for course:', courseId);
+        setVideos([]);
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching resources:', error);
+    } finally {
+      setLoading(false);
     }
-
-    // Fetch course library videos
-    const { data: videoLinks } = await supabase
-      .from('course_library_videos')
-      .select('video_id')
-      .eq('course_id', courseId);
-
-    if (videoLinks && videoLinks.length > 0) {
-      const videoIds = videoLinks.map(l => l.video_id);
-      const { data: videosData } = await supabase
-        .from('videos')
-        .select('id, title, thumbnail_url, youtube_url, duration_minutes')
-        .in('id', videoIds);
-      
-      setVideos(videosData || []);
-    }
-
-    setLoading(false);
   };
 
   if (loading) {
@@ -88,6 +137,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
 
   const hasResources = books.length > 0 || videos.length > 0;
 
+  // Show resources even if not enrolled (but with message)
   if (!hasResources) {
     return (
       <Card>
@@ -95,7 +145,9 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
           <Library className="h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No Resources Available</h3>
           <p className="text-muted-foreground text-center max-w-md">
-            This course doesn't have any additional resources attached yet.
+            {isEnrolled 
+              ? "This course doesn't have any additional resources attached yet. Check back later!"
+              : "Please enroll in this course to access resources when they become available."}
           </p>
         </CardContent>
       </Card>
@@ -104,6 +156,17 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
 
   return (
     <div className="space-y-6">
+      {!isEnrolled && (
+        <Card className="bg-muted/50 border-amber-500/30">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+              <Lock className="h-4 w-4" />
+              <span>Enroll in this course to access all resources</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       {/* Books */}
       {books.length > 0 && (
         <Card>
@@ -143,12 +206,17 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                         </Badge>
                       )}
                     </div>
-                    {isEnrolled && (
+                    {isEnrolled ? (
                       <Button asChild variant="outline" size="sm" className="w-full mt-3">
                         <a href={book.pdf_url} target="_blank" rel="noopener noreferrer">
                           <Download className="mr-2 h-3 w-3" />
                           Download
                         </a>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full mt-3" disabled>
+                        <Lock className="mr-2 h-3 w-3" />
+                        Enroll to Download
                       </Button>
                     )}
                   </CardContent>
@@ -196,12 +264,17 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                         </Badge>
                       )}
                     </div>
-                    {isEnrolled && (
+                    {isEnrolled ? (
                       <Button asChild variant="outline" size="sm" className="w-full mt-3">
                         <a href={video.youtube_url} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="mr-2 h-3 w-3" />
                           Watch
                         </a>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full mt-3" disabled>
+                        <Lock className="mr-2 h-3 w-3" />
+                        Enroll to Watch
                       </Button>
                     )}
                   </CardContent>

@@ -107,8 +107,8 @@ type PermissionMatrix = {
 };
 
 // Role hierarchy constants
-const SUPER_ADMIN_ROLES = ['super_admin', 'admin'] as const; // Super Admin can only assign these
-const ADMIN_ROLES = ['teacher', 'student', 'guardian'] as const; // Admin can only assign these
+const SUPER_ADMIN_ROLES = ['super_admin', 'admin', 'teacher', 'student', 'guardian'] as const; // Super Admin can assign all roles
+const ADMIN_ROLES = ['teacher', 'student', 'guardian'] as const; // Admin can assign these (NOT admin/super_admin)
 const ALL_ROLES = ['super_admin', 'admin', 'teacher', 'student', 'guardian'] as const;
 
 const ROLE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -527,13 +527,38 @@ export default function SuperAdminManagement() {
   };
 
   const toggleRole = async (userId: string, toggledRole: typeof ALL_ROLES[number], hasRole: boolean) => {
-    // Read-only mode - role assignment disabled
-    toast({
-      title: 'View Only Mode',
-      description: 'Role assignment is disabled. You can only view user information.',
-      variant: 'destructive',
-    });
-    return;
+    try {
+      // Only super_admin can assign super_admin/admin; admin can assign teacher/student/guardian
+      if (role === 'admin' && (toggledRole === 'super_admin' || toggledRole === 'admin')) {
+        toast({
+          title: 'Permission denied',
+          description: 'Only Super Admin can assign admin roles.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (hasRole) {
+        const { error } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId)
+          .eq('role', toggledRole as any);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: toggledRole as any });
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Role Updated',
+        description: hasRole ? `Removed ${toggledRole.replace('_', ' ')} role` : `Added ${toggledRole.replace('_', ' ')} role`,
+      });
+
+      await fetchUsers();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to update role', variant: 'destructive' });
+    }
   };
 
   const updatePermission = async (
@@ -541,21 +566,66 @@ export default function SuperAdminManagement() {
     field: 'can_create' | 'can_read' | 'can_update' | 'can_delete',
     value: boolean
   ) => {
-    // Read-only mode - permission updates disabled
-    toast({
-      title: 'View Only Mode',
-      description: 'Permission updates are disabled. You can only view permissions.',
-      variant: 'destructive',
-    });
+    if (!selectedUser) return;
+    try {
+      const { data: existing } = await supabase
+        .from('user_module_permissions')
+        .select('id')
+        .eq('user_id', selectedUser.id)
+        .eq('module_id', moduleId)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('user_module_permissions')
+          .update({ [field]: value })
+          .eq('user_id', selectedUser.id)
+          .eq('module_id', moduleId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_module_permissions')
+          .insert({ user_id: selectedUser.id, module_id: moduleId, [field]: value });
+        if (error) throw error;
+      }
+
+      setUserPermissions((prev) => prev.map((p) => (p.module_id === moduleId ? { ...p, [field]: value } : p)));
+      toast({ title: 'Permission Updated' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to update permission', variant: 'destructive' });
+    }
   };
 
   const setAllPermissions = async (moduleId: string, grant: boolean) => {
-    // Read-only mode - permission updates disabled
-    toast({
-      title: 'View Only Mode',
-      description: 'Permission updates are disabled. You can only view permissions.',
-      variant: 'destructive',
-    });
+    if (!selectedUser) return;
+    try {
+      const permData = { can_create: grant, can_read: grant, can_update: grant, can_delete: grant };
+      const { data: existing } = await supabase
+        .from('user_module_permissions')
+        .select('id')
+        .eq('user_id', selectedUser.id)
+        .eq('module_id', moduleId)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('user_module_permissions')
+          .update(permData)
+          .eq('user_id', selectedUser.id)
+          .eq('module_id', moduleId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_module_permissions')
+          .insert({ user_id: selectedUser.id, module_id: moduleId, ...permData });
+        if (error) throw error;
+      }
+
+      setUserPermissions((prev) => prev.map((p) => (p.module_id === moduleId ? { ...p, ...permData } : p)));
+      toast({ title: 'Permissions Updated', description: grant ? 'Granted full access' : 'Revoked all access' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to update permissions', variant: 'destructive' });
+    }
   };
 
   const openPermissionsDialog = async (userItem: UserWithRoles) => {
@@ -594,10 +664,10 @@ export default function SuperAdminManagement() {
   };
 
   const terminateUser = async () => {
-    // Read-only mode - termination disabled
     toast({
-      title: 'View Only Mode',
-      description: 'User termination is disabled. You can only view user information.',
+      title: 'Not implemented',
+      description:
+        'Deleting users from Supabase Auth requires server-side Admin API (service_role). This screen supports roles & permissions only.',
       variant: 'destructive',
     });
     setIsTerminateDialogOpen(false);
@@ -1106,12 +1176,12 @@ export default function SuperAdminManagement() {
                                     return (
                                       <label 
                                         key={r} 
-                                        className="flex items-center gap-1.5 text-xs cursor-not-allowed select-none opacity-50"
-                                        title="View Only Mode - Role assignment disabled"
+                                        className="flex items-center gap-1.5 text-xs cursor-pointer select-none hover:bg-muted/50 px-2 py-1 rounded transition-colors"
+                                        title={hasThisRole ? `Remove ${r.replace('_', ' ')} role` : `Assign ${r.replace('_', ' ')} role`}
                                       >
                                         <Checkbox
                                           checked={hasThisRole}
-                                          disabled={true}
+                                          onCheckedChange={() => toggleRole(userItem.id, r, hasThisRole)}
                                           className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                         />
                                         <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>

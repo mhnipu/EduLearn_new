@@ -1,11 +1,58 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GraduationCap, BookOpen, Video, FileText, Users, Award, Zap } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Landing() {
   const { user } = useAuth();
+  const [cms, setCms] = useState<{
+    badge: string;
+    title_line_1: string;
+    title_line_2: string;
+    subtitle: string;
+    cta_title: string;
+    cta_subtitle: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'landing')
+        .maybeSingle();
+
+      if (!isMounted) return;
+      if (error) {
+        console.warn('Failed to load landing CMS settings:', error.message);
+        return;
+      }
+
+      const value = (data as any)?.value;
+      if (value && typeof value === 'object') {
+        setCms({
+          badge: value.badge ?? 'Modern E-Learning Platform',
+          title_line_1: value.title_line_1 ?? 'Learn Anything,',
+          title_line_2: value.title_line_2 ?? 'Anytime, Anywhere',
+          subtitle:
+            value.subtitle ??
+            'Access high-quality courses, watch engaging video lessons, and download comprehensive study materials. Your journey to knowledge starts here.',
+          cta_title: value.cta_title ?? 'Ready to Start Learning?',
+          cta_subtitle:
+            value.cta_subtitle ??
+            'Join thousands of students already learning on our platform. Sign up now and get access to all courses.',
+        });
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -17,16 +64,17 @@ export default function Landing() {
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-sm font-medium text-primary border border-primary/20">
               <Zap className="h-4 w-4" />
-              Modern E-Learning Platform
+              {cms?.badge ?? 'Modern E-Learning Platform'}
             </div>
             
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-              Learn Anything,
-              <span className="text-primary block mt-2">Anytime, Anywhere</span>
+              {cms?.title_line_1 ?? 'Learn Anything,'}
+              <span className="text-primary block mt-2">{cms?.title_line_2 ?? 'Anytime, Anywhere'}</span>
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Access high-quality courses, watch engaging video lessons, and download comprehensive study materials. Your journey to knowledge starts here.
+              {cms?.subtitle ??
+                'Access high-quality courses, watch engaging video lessons, and download comprehensive study materials. Your journey to knowledge starts here.'}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -158,10 +206,11 @@ export default function Landing() {
               <CardContent className="p-12 text-center">
                 <GraduationCap className="h-16 w-16 text-primary mx-auto mb-6" />
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                  Ready to Start Learning?
+                  {cms?.cta_title ?? 'Ready to Start Learning?'}
                 </h2>
                 <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-                  Join thousands of students already learning on our platform. Sign up now and get access to all courses.
+                  {cms?.cta_subtitle ??
+                    'Join thousands of students already learning on our platform. Sign up now and get access to all courses.'}
                 </p>
                 <Link to="/auth">
                   <Button size="lg">

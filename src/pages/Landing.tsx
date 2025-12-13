@@ -20,32 +20,39 @@ export default function Landing() {
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'landing')
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('value')
+          .eq('key', 'landing')
+          .maybeSingle();
 
-      if (!isMounted) return;
-      if (error) {
-        console.warn('Failed to load landing CMS settings:', error.message);
-        return;
-      }
+        if (!isMounted) return;
 
-      const value = (data as any)?.value;
-      if (value && typeof value === 'object') {
-        setCms({
-          badge: value.badge ?? 'Modern E-Learning Platform',
-          title_line_1: value.title_line_1 ?? 'Learn Anything,',
-          title_line_2: value.title_line_2 ?? 'Anytime, Anywhere',
-          subtitle:
-            value.subtitle ??
-            'Access high-quality courses, watch engaging video lessons, and download comprehensive study materials. Your journey to knowledge starts here.',
-          cta_title: value.cta_title ?? 'Ready to Start Learning?',
-          cta_subtitle:
-            value.cta_subtitle ??
-            'Join thousands of students already learning on our platform. Sign up now and get access to all courses.',
-        });
+        if (error) {
+          console.warn('Failed to load landing CMS settings:', error.message);
+          return;
+        }
+
+        const value = (data as any)?.value;
+        if (value && typeof value === 'object') {
+          setCms({
+            badge: value.badge ?? 'Modern E-Learning Platform',
+            title_line_1: value.title_line_1 ?? 'Learn Anything,',
+            title_line_2: value.title_line_2 ?? 'Anytime, Anywhere',
+            subtitle:
+              value.subtitle ??
+              'Access high-quality courses, watch engaging video lessons, and download comprehensive study materials. Your journey to knowledge starts here.',
+            cta_title: value.cta_title ?? 'Ready to Start Learning?',
+            cta_subtitle:
+              value.cta_subtitle ??
+              'Join thousands of students already learning on our platform. Sign up now and get access to all courses.',
+          });
+        }
+      } catch (error: any) {
+        if (isMounted) {
+          console.warn('Error loading landing CMS settings:', error.message);
+        }
       }
     })();
 

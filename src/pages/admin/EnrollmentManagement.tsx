@@ -900,6 +900,7 @@ export default function EnrollmentManagement() {
                       {teachers.length} teacher(s) available
                     </p>
                   </div>
+
                 </div>
                 <DialogFooter className="gap-2 sm:gap-0">
                   <Button 

@@ -6,11 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Users, BookOpen, Award, TrendingUp, Target, Eye, Shield, CheckCircle2, Clock, Trophy, Star, BarChart3 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
+import { Users, BookOpen, Award, TrendingUp, Target, Eye, Shield, CheckCircle2, Clock, Trophy, Star, BarChart3, FileText, GraduationCap, ChevronDown, ChevronUp, Mail, Phone, Book, Video, Library } from 'lucide-react';
 import {
   RadialBarChart, RadialBar, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
+
+interface Teacher {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  course_title: string;
+}
 
 interface Student {
   id: string;
@@ -19,6 +29,7 @@ interface Student {
   profile: {
     full_name: string;
   } | null;
+  teachers?: Teacher[];
 }
 
 interface StudentProgress {
@@ -27,6 +38,65 @@ interface StudentProgress {
   enrolledCourses: number;
   completedCourses: number;
   certificates: number;
+  assignments?: number;
+  assignmentsCompleted?: number;
+  quizzes?: number;
+  quizzesPassed?: number;
+  averageScore?: number;
+}
+
+interface StudentCourse {
+  courseId: string;
+  courseTitle: string;
+  enrolledAt: string;
+  completedAt: string | null;
+  progress: number;
+  courseDescription?: string;
+  teacherName?: string;
+  teacherEmail?: string;
+  teacherPhone?: string;
+}
+
+interface StudentAssignment {
+  assignmentId: string;
+  assignmentTitle: string;
+  courseTitle: string;
+  dueDate: string | null;
+  maxScore: number;
+  score: number | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  feedback: string | null;
+}
+
+interface StudentQuiz {
+  quizId: string;
+  quizTitle: string;
+  courseTitle: string;
+  passingScore: number;
+  score: number | null;
+  passed: boolean | null;
+  submittedAt: string | null;
+}
+
+interface StudentExam {
+  examId: string;
+  examTitle: string;
+  courseTitle: string;
+  dueDate: string | null;
+  maxScore: number;
+  score: number | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  feedback: string | null;
+}
+
+interface LibraryItem {
+  id: string;
+  title: string;
+  type: 'book' | 'video';
+  accessedAt: string | null;
+  progress?: number;
 }
 
 const GuardianDashboard = () => {
@@ -34,7 +104,15 @@ const GuardianDashboard = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [studentProgress, setStudentProgress] = useState<StudentProgress[]>([]);
+  const [studentCourses, setStudentCourses] = useState<Record<string, StudentCourse[]>>({});
+  const [studentAssignments, setStudentAssignments] = useState<Record<string, StudentAssignment[]>>({});
+  const [studentQuizzes, setStudentQuizzes] = useState<Record<string, StudentQuiz[]>>({});
+  const [studentExams, setStudentExams] = useState<Record<string, StudentExam[]>>({});
+  const [studentLibraryItems, setStudentLibraryItems] = useState<Record<string, LibraryItem[]>>({});
+  const [studentTeachers, setStudentTeachers] = useState<Record<string, Teacher[]>>({});
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -50,50 +128,557 @@ const GuardianDashboard = () => {
     }
   }, [user, role]);
 
+  // Refresh data when component becomes visible (handles new enrollments)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user && role === 'guardian') {
+        fetchGuardianData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, role]);
+
   const fetchGuardianData = async () => {
     try {
-      // Fetch assigned students
-      const { data: studentsData } = await supabase
+      setError(null);
+      setLoadingData(true);
+
+      // First, try to get students from student_guardians table
+      const { data: guardianRelationships, error: relationshipError } = await supabase
         .from('student_guardians')
-        .select('id, student_id, relationship')
+        .select('student_id, relationship')
         .eq('guardian_id', user?.id);
 
-      if (!studentsData || studentsData.length === 0) {
+      if (relationshipError) {
+        console.error('Error fetching guardian relationships:', relationshipError);
+        setError('Failed to load student data. Please try again.');
         setLoadingData(false);
         return;
       }
 
-      // Fetch student profiles separately
-      const studentIds = studentsData.map(s => s.student_id);
-      const { data: profiles } = await supabase
+      if (!guardianRelationships || guardianRelationships.length === 0) {
+        setLoadingData(false);
+        return;
+      }
+
+      const studentIds = guardianRelationships.map(r => r.student_id);
+
+      // Fetch student profiles
+      const { data: studentProfiles, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name')
+        .select('id, full_name, avatar_url')
         .in('id', studentIds);
 
-      const studentsWithProfiles = studentsData.map(s => ({
-        ...s,
-        profile: profiles?.find(p => p.id === s.student_id) || null
-      }));
+      if (profileError) {
+        console.error('Error fetching student profiles:', profileError);
+        setError('Failed to load student profiles.');
+      }
 
+      // Try to get teacher information from the view (using rpc or direct query)
+      let studentsWithTeachers: any[] = [];
+      try {
+        // Use a direct SQL query via RPC or try the view with proper error handling
+        const { data: viewData, error: viewError } = await (supabase as any)
+          .from('guardian_students_with_teachers')
+          .select('*')
+          .eq('guardian_id', user?.id);
+
+        if (!viewError && viewData) {
+          studentsWithTeachers = viewData;
+        }
+      } catch (e) {
+        console.warn('View guardian_students_with_teachers not available, will fetch teachers manually');
+      }
+
+      // Group students by student_id (since one student can have multiple teachers)
+      const studentsMap = new Map();
+      
+      // Initialize students from relationships
+      guardianRelationships.forEach((rel) => {
+        const profile = studentProfiles?.find(p => p.id === rel.student_id);
+        if (!studentsMap.has(rel.student_id)) {
+          studentsMap.set(rel.student_id, {
+            id: rel.student_id,
+            student_id: rel.student_id,
+            relationship: rel.relationship,
+            profile: {
+              full_name: profile?.full_name || 'Unknown',
+              avatar_url: profile?.avatar_url,
+            },
+            teachers: [],
+          });
+        }
+      });
+
+      // Add teacher information from view data
+      studentsWithTeachers.forEach((item: any) => {
+        if (studentsMap.has(item.student_id)) {
+          const existingTeacher = studentsMap.get(item.student_id).teachers.find(
+            (t: Teacher) => t.id === item.teacher_id && t.course_title === item.course_title
+          );
+          if (!existingTeacher && item.teacher_id) {
+            studentsMap.get(item.student_id).teachers.push({
+              id: item.teacher_id,
+              name: item.teacher_name,
+              email: item.teacher_email,
+              phone: item.teacher_phone,
+              course_title: item.course_title,
+            });
+          }
+        }
+      });
+
+      const studentsWithProfiles = Array.from(studentsMap.values());
       setStudents(studentsWithProfiles);
 
-      // Fetch progress for each student
-      const progressPromises = studentIds.map(async (studentId) => {
-        const [enrollments, completed, certs] = await Promise.all([
+      // Fetch comprehensive data for each student
+      const studentIdsList = studentsWithProfiles.map(s => s.student_id);
+      console.log('Fetching data for students:', studentIdsList);
+      
+      const progressPromises = studentIdsList.map(async (studentId) => {
+        console.log(`Fetching data for student: ${studentId}`);
+        
+        // Fetch course enrollments with detailed information
+        // Try using the comprehensive view first, then fallback to direct query
+        let coursesData: any[] = [];
+        let coursesError: any = null;
+
+        // Try comprehensive view first
+        try {
+          const { data: viewData, error: viewErr } = await (supabase as any)
+            .from('guardian_student_comprehensive_data')
+            .select('course_id, course_title, course_description, course_enrolled_at, course_completed_at')
+            .eq('student_id', studentId)
+            .eq('guardian_id', user?.id);
+
+          if (!viewErr && viewData) {
+            // Transform view data to match expected format
+            coursesData = viewData.map((item: any) => ({
+              course_id: item.course_id,
+              enrolled_at: item.course_enrolled_at,
+              completed_at: item.course_completed_at,
+              courses: {
+                id: item.course_id,
+                title: item.course_title,
+                description: item.course_description,
+              }
+            }));
+            console.log(`Found ${coursesData.length} enrollments via comprehensive view for student ${studentId}`);
+          }
+        } catch (e) {
+          console.warn('Comprehensive view not available, using direct query');
+        }
+
+        // Fallback to direct query if view didn't work or returned no data
+        if (coursesData.length === 0) {
+          const { data: directData, error: directError } = await supabase
+            .from('course_enrollments')
+            .select(`
+              course_id,
+              enrolled_at,
+              completed_at,
+              courses (
+                id,
+                title,
+                description
+              )
+            `)
+            .eq('user_id', studentId);
+
+          if (directError) {
+            console.error(`Error fetching courses for student ${studentId}:`, directError);
+            coursesError = directError;
+          } else {
+            coursesData = directData || [];
+            console.log(`Found ${coursesData.length} enrollments via direct query for student ${studentId}`);
+          }
+        }
+
+        const [
+          enrollments,
+          completed,
+          certs,
+          assignments,
+          assignmentsCompleted,
+          quizzes,
+          quizzesPassed
+        ] = await Promise.all([
+          // Course enrollments count
           supabase
             .from('course_enrollments')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', studentId),
+          // Completed courses count
           supabase
             .from('course_enrollments')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', studentId)
             .not('completed_at', 'is', null),
+          // Certificates
           supabase
             .from('certificates')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', studentId),
+          // Assignments
+          supabase
+            .from('assignment_submissions')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_id', studentId),
+          supabase
+            .from('assignment_submissions')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_id', studentId)
+            .not('score', 'is', null),
+          // Quizzes
+          supabase
+            .from('quiz_submissions')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_id', studentId),
+          supabase
+            .from('quiz_submissions')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_id', studentId)
+            .eq('passed', true),
         ]);
+
+        // Calculate average score
+        const { data: allScores } = await supabase
+          .from('assignment_submissions')
+          .select('score')
+          .eq('student_id', studentId)
+          .not('score', 'is', null);
+
+        const { data: quizScores } = await supabase
+          .from('quiz_submissions')
+          .select('score')
+          .eq('student_id', studentId)
+          .not('score', 'is', null);
+
+        const allScoresList = [
+          ...(allScores?.map(s => s.score).filter(Boolean) || []),
+          ...(quizScores?.map(s => s.score).filter(Boolean) || [])
+        ];
+        const averageScore = allScoresList.length > 0
+          ? Math.round(allScoresList.reduce((a, b) => a + b, 0) / allScoresList.length)
+          : undefined;
+
+        // Calculate course progress using learning_progress
+        const coursesWithProgress = await Promise.all(
+          (coursesData || []).map(async (ce: any) => {
+            console.log(`Processing course ${ce.course_id} for student ${studentId}`);
+            // Get total lessons and materials for this course
+            const [lessonsResult, materialsResult] = await Promise.all([
+              supabase
+                .from('lessons')
+                .select('id', { count: 'exact', head: true })
+                .eq('course_id', ce.course_id),
+              supabase
+                .from('course_materials')
+                .select('id', { count: 'exact', head: true })
+                .eq('course_id', ce.course_id),
+            ]);
+
+            const totalItems = (lessonsResult.count || 0) + (materialsResult.count || 0);
+
+            // Get completed items
+            const { count: completedCount } = await supabase
+              .from('learning_progress')
+              .select('*', { count: 'exact', head: true })
+              .eq('student_id', studentId)
+              .eq('completed', true)
+              .in('content_id', [
+                ...(lessonsResult.data?.map((l: any) => l.id) || []),
+                ...(materialsResult.data?.map((m: any) => m.id) || []),
+              ]);
+
+            const progress = totalItems > 0 
+              ? Math.round(((completedCount || 0) / totalItems) * 100)
+              : 0;
+
+            // Get ALL teachers for this course
+            const courseTeachers: Teacher[] = [];
+            try {
+              // Try RPC function first
+              const { data: teachersData } = await (supabase as any)
+                .rpc('get_course_teachers', { _course_id: ce.course_id });
+
+              if (teachersData && Array.isArray(teachersData)) {
+                for (const teacherData of teachersData) {
+                  if (teacherData.teacher_id) {
+                    const { data: teacherProfile } = await supabase
+                      .from('profiles')
+                      .select('full_name')
+                      .eq('id', teacherData.teacher_id)
+                      .single();
+
+                    if (teacherProfile) {
+                      courseTeachers.push({
+                        id: teacherData.teacher_id,
+                        name: teacherProfile.full_name,
+                        course_title: ce.courses?.title || 'Unknown Course',
+                      });
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              // Fallback: query teacher_course_assignments directly
+              try {
+                const { data: tcaData } = await (supabase as any)
+                  .from('teacher_course_assignments')
+                  .select('teacher_id')
+                  .eq('course_id', ce.course_id);
+
+                if (tcaData && Array.isArray(tcaData)) {
+                  for (const tca of tcaData) {
+                    if (tca.teacher_id) {
+                      const { data: teacherProfile } = await supabase
+                        .from('profiles')
+                        .select('full_name')
+                        .eq('id', tca.teacher_id)
+                        .single();
+
+                      if (teacherProfile) {
+                        courseTeachers.push({
+                          id: tca.teacher_id,
+                          name: teacherProfile.full_name,
+                          course_title: ce.courses?.title || 'Unknown Course',
+                        });
+                      }
+                    }
+                  }
+                }
+              } catch (e2) {
+                console.warn('Could not fetch teachers for course:', ce.course_id);
+              }
+            }
+
+            // Store teachers for this student
+            if (courseTeachers.length > 0) {
+              setStudentTeachers(prev => {
+                const existing = prev[studentId] || [];
+                const newTeachers = courseTeachers.filter(t => 
+                  !existing.some(et => et.id === t.id && et.course_title === t.course_title)
+                );
+                return { ...prev, [studentId]: [...existing, ...newTeachers] };
+              });
+            }
+
+            // Use first teacher for course display (for backward compatibility)
+            const teacherName = courseTeachers.length > 0 ? courseTeachers[0].name : undefined;
+
+            return {
+              courseId: ce.course_id,
+              courseTitle: ce.courses?.title || 'Unknown Course',
+              courseDescription: ce.courses?.description,
+              enrolledAt: ce.enrolled_at,
+              completedAt: ce.completed_at,
+              progress: Math.min(progress, 100),
+              teacherName,
+            };
+          })
+        );
+
+        setStudentCourses(prev => ({ ...prev, [studentId]: coursesWithProgress }));
+
+        // Fetch library items accessed by this student (including permissions)
+        const { data: libraryProgress } = await supabase
+          .from('learning_progress')
+          .select(`
+            content_id,
+            content_type,
+            last_accessed_at,
+            progress_percentage,
+            completed
+          `)
+          .eq('student_id', studentId)
+          .in('content_type', ['book', 'video']);
+
+        // Also check library permissions to show what student has access to
+        let libraryPermissions: any[] = [];
+        try {
+          const { data: permData } = await (supabase as any)
+            .from('library_user_permissions')
+            .select('content_id, content_type')
+            .eq('user_id', studentId);
+          libraryPermissions = permData || [];
+        } catch (e) {
+          console.warn('Could not fetch library permissions:', e);
+        }
+
+        const libraryItems: LibraryItem[] = [];
+        const processedIds = new Set<string>();
+
+        // Add items from learning progress (actually accessed)
+        if (libraryProgress) {
+          for (const item of libraryProgress) {
+            const key = `${item.content_type}-${item.content_id}`;
+            if (processedIds.has(key)) continue;
+            processedIds.add(key);
+
+            if (item.content_type === 'book') {
+              const { data: book } = await supabase
+                .from('books')
+                .select('id, title')
+                .eq('id', item.content_id)
+                .single();
+              if (book) {
+                libraryItems.push({
+                  id: book.id,
+                  title: book.title,
+                  type: 'book',
+                  accessedAt: item.last_accessed_at,
+                  progress: item.progress_percentage || 0,
+                });
+              }
+            } else if (item.content_type === 'video') {
+              const { data: video } = await supabase
+                .from('videos')
+                .select('id, title')
+                .eq('id', item.content_id)
+                .single();
+              if (video) {
+                libraryItems.push({
+                  id: video.id,
+                  title: video.title,
+                  type: 'video',
+                  accessedAt: item.last_accessed_at,
+                  progress: item.progress_percentage || 0,
+                });
+              }
+            }
+          }
+        }
+
+        // Add items from permissions (has access but may not have accessed yet)
+        if (libraryPermissions && Array.isArray(libraryPermissions)) {
+          for (const perm of libraryPermissions) {
+            const key = `${perm.content_type}-${perm.content_id}`;
+            if (processedIds.has(key)) continue;
+            processedIds.add(key);
+
+            if (perm.content_type === 'book') {
+              const { data: book } = await supabase
+                .from('books')
+                .select('id, title')
+                .eq('id', perm.content_id)
+                .single();
+              if (book) {
+                libraryItems.push({
+                  id: book.id,
+                  title: book.title,
+                  type: 'book',
+                  accessedAt: null,
+                  progress: 0,
+                });
+              }
+            } else if (perm.content_type === 'video') {
+              const { data: video } = await supabase
+                .from('videos')
+                .select('id, title')
+                .eq('id', perm.content_id)
+                .single();
+              if (video) {
+                libraryItems.push({
+                  id: video.id,
+                  title: video.title,
+                  type: 'video',
+                  accessedAt: null,
+                  progress: 0,
+                });
+              }
+            }
+          }
+        }
+
+        setStudentLibraryItems(prev => ({ ...prev, [studentId]: libraryItems }));
+
+        // Fetch assignments for this student (excluding exams)
+        const { data: assignmentsData } = await supabase
+          .from('assignment_submissions')
+          .select(`
+            assignment_id,
+            score,
+            submitted_at,
+            graded_at,
+            feedback,
+            assignments (
+              id,
+              title,
+              due_date,
+              max_score,
+              assessment_type,
+              courses (
+                title
+              )
+            )
+          `)
+          .eq('student_id', studentId);
+
+        // Separate assignments and exams
+        const assignmentsList: StudentAssignment[] = [];
+        const examsList: StudentExam[] = [];
+
+        (assignmentsData || []).forEach((sub: any) => {
+          const assessmentType = sub.assignments?.assessment_type || 'assignment';
+          const baseData = {
+            courseTitle: sub.assignments?.courses?.title || 'Unknown Course',
+            dueDate: sub.assignments?.due_date || null,
+            maxScore: sub.assignments?.max_score || 100,
+            score: sub.score,
+            submittedAt: sub.submitted_at,
+            gradedAt: sub.graded_at,
+            feedback: sub.feedback,
+          };
+
+          if (assessmentType === 'exam') {
+            examsList.push({
+              examId: sub.assignment_id,
+              examTitle: sub.assignments?.title || 'Unknown Exam',
+              ...baseData,
+            });
+          } else {
+            assignmentsList.push({
+              assignmentId: sub.assignment_id,
+              assignmentTitle: sub.assignments?.title || 'Unknown Assignment',
+              ...baseData,
+            });
+          }
+        });
+
+        setStudentAssignments(prev => ({ ...prev, [studentId]: assignmentsList }));
+        setStudentExams(prev => ({ ...prev, [studentId]: examsList }));
+
+        // Fetch quizzes for this student
+        const { data: quizzesData } = await supabase
+          .from('quiz_submissions')
+          .select(`
+            quiz_id,
+            score,
+            passed,
+            submitted_at,
+            quizzes (
+              id,
+              title,
+              passing_score,
+              courses (
+                title
+              )
+            )
+          `)
+          .eq('student_id', studentId);
+
+        const quizzesList: StudentQuiz[] = (quizzesData || []).map((qs: any) => ({
+          quizId: qs.quiz_id,
+          quizTitle: qs.quizzes?.title || 'Unknown Quiz',
+          courseTitle: qs.quizzes?.courses?.title || 'Unknown Course',
+          passingScore: qs.quizzes?.passing_score || 70,
+          score: qs.score,
+          passed: qs.passed,
+          submittedAt: qs.submitted_at,
+        }));
+        setStudentQuizzes(prev => ({ ...prev, [studentId]: quizzesList }));
 
         const student = studentsWithProfiles.find(s => s.student_id === studentId);
 
@@ -103,22 +688,51 @@ const GuardianDashboard = () => {
           enrolledCourses: enrollments.count || 0,
           completedCourses: completed.count || 0,
           certificates: certs.count || 0,
+          assignments: assignments.count || 0,
+          assignmentsCompleted: assignmentsCompleted.count || 0,
+          quizzes: quizzes.count || 0,
+          quizzesPassed: quizzesPassed.count || 0,
+          averageScore,
         };
       });
 
       const progressData = await Promise.all(progressPromises);
       setStudentProgress(progressData);
-    } catch (error) {
+      
+      // Log summary
+      console.log('Guardian Dashboard Data Summary:');
+      console.log(`- Students: ${studentsWithProfiles.length}`);
+      console.log(`- Total Enrollments: ${progressData.reduce((acc, s) => acc + s.enrolledCourses, 0)}`);
+      console.log(`- Total Completed: ${progressData.reduce((acc, s) => acc + s.completedCourses, 0)}`);
+      console.log(`- Total Certificates: ${progressData.reduce((acc, s) => acc + s.certificates, 0)}`);
+      
+    } catch (error: any) {
       console.error('Error fetching guardian data:', error);
+      setError(`Failed to load dashboard data: ${error.message || 'Unknown error'}. Please ensure you have proper permissions and try refreshing the page.`);
     } finally {
       setLoadingData(false);
     }
   };
 
+
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-sm text-muted-foreground">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="text-destructive text-lg font-semibold">{error}</div>
+          <Button onClick={() => fetchGuardianData()}>Retry</Button>
+        </div>
       </div>
     );
   }
@@ -309,7 +923,7 @@ const GuardianDashboard = () => {
                             </div>
                             <div>
                               <h3 className="text-xl font-bold text-foreground">{student.studentName}</h3>
-                              <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 <Badge variant="secondary" className="text-xs">
                                   {students.find(s => s.student_id === student.studentId)?.relationship || 'Student'}
                                 </Badge>
@@ -320,6 +934,53 @@ const GuardianDashboard = () => {
                                   </Badge>
                                 )}
                               </div>
+                              {/* Show ALL teachers for this student */}
+                              {(students.find(s => s.student_id === student.studentId)?.teachers && 
+                                students.find(s => s.student_id === student.studentId)!.teachers!.length > 0) ||
+                               (studentTeachers[student.studentId] && studentTeachers[student.studentId].length > 0) ? (
+                                <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    All Associated Teachers
+                                  </p>
+                                  <div className="space-y-2">
+                                    {(() => {
+                                      const allTeachers = [
+                                        ...(students.find(s => s.student_id === student.studentId)?.teachers || []),
+                                        ...(studentTeachers[student.studentId] || [])
+                                      ];
+                                      // Remove duplicates
+                                      const uniqueTeachers = Array.from(
+                                        new Map(allTeachers.map(t => [`${t.id}-${t.course_title}`, t])).values()
+                                      );
+                                      return uniqueTeachers.map((teacher, idx) => (
+                                        <div key={idx} className="p-2 bg-white dark:bg-gray-800 rounded-md border border-blue-100 dark:border-blue-900">
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <p className="font-medium text-sm">{teacher.name}</p>
+                                              <p className="text-xs text-muted-foreground mt-1">{teacher.course_title}</p>
+                                              <div className="flex items-center gap-3 mt-2">
+                                                {teacher.email && (
+                                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <Mail className="h-3 w-3" />
+                                                    <span>{teacher.email}</span>
+                                                  </div>
+                                                )}
+                                                {teacher.phone && (
+                                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <Phone className="h-3 w-3" />
+                                                    <span>{teacher.phone}</span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
                           </div>
 
@@ -449,6 +1110,318 @@ const GuardianDashboard = () => {
                               <p className="text-sm text-muted-foreground">No activity data available</p>
                             )}
                           </div>
+                        </div>
+
+                        {/* Detailed Student Data - Expandable Sections */}
+                        <div className="mt-6 space-y-4">
+                          <Collapsible
+                            open={selectedStudentId === student.studentId}
+                            onOpenChange={(open) => setSelectedStudentId(open ? student.studentId : null)}
+                          >
+                            <CollapsibleTrigger asChild>
+                              <Button variant="outline" className="w-full justify-between">
+                                <span className="flex items-center gap-2">
+                                  <Eye className="h-4 w-4" />
+                                  View Detailed Information
+                                </span>
+                                {selectedStudentId === student.studentId ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-4 space-y-4">
+                              {/* Courses Section */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <BookOpen className="h-5 w-5" />
+                                    Enrolled Courses
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  {studentCourses[student.studentId] && studentCourses[student.studentId].length > 0 ? (
+                                    <div className="space-y-3">
+                                      {studentCourses[student.studentId].map((course) => (
+                                        <div key={course.courseId} className="p-4 border rounded-lg space-y-3 hover:bg-muted/50 transition-colors">
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <p className="font-semibold text-lg">{course.courseTitle}</p>
+                                              {course.courseDescription && (
+                                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                                  {course.courseDescription}
+                                                </p>
+                                              )}
+                                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                                <span>Enrolled: {new Date(course.enrolledAt).toLocaleDateString()}</span>
+                                                {course.completedAt && (
+                                                  <span className="text-green-600">
+                                                    Completed: {new Date(course.completedAt).toLocaleDateString()}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {course.teacherName && (
+                                                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded-md">
+                                                  <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Course Teacher:</p>
+                                                  <div className="flex items-center gap-2 text-sm">
+                                                    <Users className="h-3 w-3" />
+                                                    <span className="font-medium">{course.teacherName}</span>
+                                              {course.teacherPhone && (
+                                                <span className="text-muted-foreground">• {course.teacherPhone}</span>
+                                              )}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                            <div className="ml-4 text-right">
+                                              {course.completedAt ? (
+                                                <Badge className="bg-green-500">Completed</Badge>
+                                              ) : (
+                                                <Badge variant="outline">In Progress</Badge>
+                                              )}
+                                              <div className="mt-2">
+                                                <div className="text-sm font-semibold">{course.progress}%</div>
+                                                <Progress value={course.progress} className="w-20 h-2 mt-1" />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No courses enrolled</p>
+                                  )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Assignments Section */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <FileText className="h-5 w-5" />
+                                    Assignments & Exams
+                                    {student.assignments !== undefined && (
+                                      <Badge variant="secondary" className="ml-2">
+                                        {student.assignmentsCompleted || 0} / {student.assignments || 0} Completed
+                                      </Badge>
+                                    )}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  {studentAssignments[student.studentId] && studentAssignments[student.studentId].length > 0 ? (
+                                    <div className="space-y-3">
+                                      {studentAssignments[student.studentId].map((assignment) => (
+                                        <div key={assignment.assignmentId} className="p-3 border rounded-lg">
+                                          <div className="flex items-start justify-between mb-2">
+                                            <div className="flex-1">
+                                              <p className="font-medium">{assignment.assignmentTitle}</p>
+                                              <p className="text-sm text-muted-foreground">{assignment.courseTitle}</p>
+                                            </div>
+                                            {assignment.score !== null ? (
+                                              <Badge className={assignment.score >= (assignment.maxScore * 0.7) ? 'bg-green-500' : 'bg-orange-500'}>
+                                                {assignment.score} / {assignment.maxScore}
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline">Pending</Badge>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground space-y-1">
+                                            {assignment.dueDate && (
+                                              <p>Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
+                                            )}
+                                            {assignment.submittedAt && (
+                                              <p>Submitted: {new Date(assignment.submittedAt).toLocaleDateString()}</p>
+                                            )}
+                                            {assignment.gradedAt && (
+                                              <p className="text-green-600">Graded: {new Date(assignment.gradedAt).toLocaleDateString()}</p>
+                                            )}
+                                            {assignment.feedback && (
+                                              <p className="mt-2 p-2 bg-muted rounded">Feedback: {assignment.feedback}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No assignments submitted</p>
+                                  )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Quizzes Section */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <GraduationCap className="h-5 w-5" />
+                                    Quizzes & Tests
+                                    {student.quizzes !== undefined && (
+                                      <Badge variant="secondary" className="ml-2">
+                                        {student.quizzesPassed || 0} / {student.quizzes || 0} Passed
+                                      </Badge>
+                                    )}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  {studentQuizzes[student.studentId] && studentQuizzes[student.studentId].length > 0 ? (
+                                    <div className="space-y-3">
+                                      {studentQuizzes[student.studentId].map((quiz) => (
+                                        <div key={quiz.quizId} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                          <div className="flex items-start justify-between mb-2">
+                                            <div className="flex-1">
+                                              <p className="font-medium">{quiz.quizTitle}</p>
+                                              <p className="text-sm text-muted-foreground">{quiz.courseTitle}</p>
+                                            </div>
+                                            {quiz.score !== null ? (
+                                              <Badge className={quiz.passed ? 'bg-green-500' : 'bg-red-500'}>
+                                                {quiz.score}% {quiz.passed ? '✓' : '✗'}
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline">Not Taken</Badge>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">
+                                            <p>Passing Score: {quiz.passingScore}%</p>
+                                            {quiz.submittedAt && (
+                                              <p>Submitted: {new Date(quiz.submittedAt).toLocaleDateString()}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No quizzes taken</p>
+                                  )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Exams Section */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <FileText className="h-5 w-5" />
+                                    Exams
+                                    {studentExams[student.studentId] && (
+                                      <Badge variant="secondary" className="ml-2">
+                                        {studentExams[student.studentId].length} Exam{studentExams[student.studentId].length !== 1 ? 's' : ''}
+                                      </Badge>
+                                    )}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  {studentExams[student.studentId] && studentExams[student.studentId].length > 0 ? (
+                                    <div className="space-y-3">
+                                      {studentExams[student.studentId].map((exam) => (
+                                        <div key={exam.examId} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                          <div className="flex items-start justify-between mb-2">
+                                            <div className="flex-1">
+                                              <p className="font-medium">{exam.examTitle}</p>
+                                              <p className="text-sm text-muted-foreground">{exam.courseTitle}</p>
+                                            </div>
+                                            {exam.score !== null ? (
+                                              <Badge className={exam.score >= (exam.maxScore * 0.7) ? 'bg-green-500' : exam.score >= (exam.maxScore * 0.5) ? 'bg-orange-500' : 'bg-red-500'}>
+                                                {exam.score} / {exam.maxScore}
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline">Pending</Badge>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground space-y-1">
+                                            {exam.dueDate && (
+                                              <p>Due: {new Date(exam.dueDate).toLocaleDateString()}</p>
+                                            )}
+                                            {exam.submittedAt && (
+                                              <p>Submitted: {new Date(exam.submittedAt).toLocaleDateString()}</p>
+                                            )}
+                                            {exam.gradedAt && (
+                                              <p className="text-green-600">Graded: {new Date(exam.gradedAt).toLocaleDateString()}</p>
+                                            )}
+                                            {exam.feedback && (
+                                              <p className="mt-2 p-2 bg-muted rounded">Feedback: {exam.feedback}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No exams taken</p>
+                                  )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Library Section */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <Library className="h-5 w-5" />
+                                    Library Access
+                                    {studentLibraryItems[student.studentId] && (
+                                      <Badge variant="secondary" className="ml-2">
+                                        {studentLibraryItems[student.studentId].length} Items
+                                      </Badge>
+                                    )}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  {studentLibraryItems[student.studentId] && studentLibraryItems[student.studentId].length > 0 ? (
+                                    <div className="space-y-3">
+                                      {studentLibraryItems[student.studentId].map((item) => (
+                                        <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                          <div className="flex items-center gap-3">
+                                            {item.type === 'book' ? (
+                                              <Book className="h-5 w-5 text-blue-500" />
+                                            ) : (
+                                              <Video className="h-5 w-5 text-purple-500" />
+                                            )}
+                                            <div>
+                                              <p className="font-medium">{item.title}</p>
+                                              <p className="text-xs text-muted-foreground">
+                                                {item.type === 'book' ? 'Book' : 'Video'}
+                                                {item.accessedAt && (
+                                                  <span className="ml-2">
+                                                    • Last accessed: {new Date(item.accessedAt).toLocaleDateString()}
+                                                  </span>
+                                                )}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          {item.progress !== undefined && (
+                                            <div className="text-right">
+                                              <div className="text-sm font-semibold">{item.progress}%</div>
+                                              <Progress value={item.progress} className="w-20 h-2 mt-1" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">No library items accessed yet</p>
+                                  )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Average Score */}
+                              {student.averageScore !== undefined && (
+                                <Card>
+                                  <CardHeader>
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                      <BarChart3 className="h-5 w-5" />
+                                      Overall Performance
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="text-center">
+                                      <div className="text-4xl font-bold text-primary mb-2">
+                                        {student.averageScore}%
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">Average Score</p>
+                                      <Progress value={student.averageScore} className="mt-4" />
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              )}
+                            </CollapsibleContent>
+                          </Collapsible>
                         </div>
                       </CardContent>
                     </Card>

@@ -40,6 +40,7 @@ import AssignmentManagement from "./pages/admin/AssignmentManagement";
 import AssignmentSubmissions from "./pages/admin/AssignmentSubmissions";
 import SiteContent from "./pages/admin/SiteContent";
 import StudentAssignments from "./pages/student/StudentAssignments";
+import ProfileCompletion from "./pages/ProfileCompletion";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -102,6 +103,9 @@ const App = () => (
                 <ProtectedRoute>
                   <Profile />
                 </ProtectedRoute>
+              } />
+              <Route path="/profile-completion" element={
+                <ProfileCompletion />
               } />
               <Route path="/library" element={
                 <ProtectedRoute>

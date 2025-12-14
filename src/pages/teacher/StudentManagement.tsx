@@ -31,6 +31,12 @@ interface Student {
   progress?: number;
   completed_lessons?: number;
   total_lessons?: number;
+  // Guardian information
+  guardian_name?: string | null;
+  guardian_email?: string | null;
+  guardian_phone?: string | null;
+  guardian_address?: string | null;
+  guardian_relationship?: string | null;
 }
 
 interface Course {
@@ -134,35 +140,28 @@ const StudentManagement = () => {
 
     setLoading(true);
     try {
-      // Get enrolled students for the selected course
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select(`
-          user_id,
-          enrolled_at,
-          course_id,
-          courses (
-            id,
-            title
-          )
-        `)
+      // Use the new view that includes guardian information
+      const { data: studentsWithGuardians, error: viewError } = await supabase
+        .from('teacher_students_with_guardians')
+        .select('*')
+        .eq('teacher_id', user?.id)
         .eq('course_id', selectedCourse)
         .order('enrolled_at', { ascending: false });
 
-      if (!enrollments) {
+      if (viewError) {
+        console.warn('View not available, falling back to manual query:', viewError);
+        // Fallback to manual query if view doesn't exist yet
+        await fetchStudentsManual();
+        return;
+      }
+
+      if (!studentsWithGuardians) {
         setStudents([]);
         setLoading(false);
         return;
       }
 
-      // Fetch student profiles and progress
-      const studentIds = enrollments.map(e => e.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, email, phone')
-        .in('id', studentIds);
-
-      // Get course lessons count
+      // Get course lessons count for progress calculation
       const { count: totalLessons } = await supabase
         .from('lessons')
         .select('*', { count: 'exact', head: true })
@@ -170,34 +169,37 @@ const StudentManagement = () => {
 
       // Get progress for each student
       const studentsWithData = await Promise.all(
-        enrollments.map(async (enrollment) => {
-          const profile = profiles?.find(p => p.id === enrollment.user_id);
-          const course = enrollment.courses as any;
-
+        studentsWithGuardians.map(async (student: any) => {
           // Get completed lessons count
           const { count: completedLessons } = await supabase
             .from('learning_progress')
             .select('*', { count: 'exact', head: true })
-            .eq('student_id', enrollment.user_id)
+            .eq('student_id', student.student_id)
             .eq('course_id', selectedCourse)
             .eq('completed', true);
 
           const progress = totalLessons && totalLessons > 0
             ? Math.round(((completedLessons || 0) / totalLessons) * 100)
-            : 0;
+            : (student.progress_percentage || 0);
 
           return {
-            id: enrollment.user_id,
-            full_name: profile?.full_name || 'Unknown',
-            avatar_url: profile?.avatar_url || null,
-            email: profile?.email || undefined,
-            phone: profile?.phone || undefined,
-            enrolled_at: enrollment.enrolled_at,
-            course_id: enrollment.course_id,
-            course_title: course?.title || 'Unknown Course',
+            id: student.student_id,
+            full_name: student.student_name || 'Unknown',
+            avatar_url: student.student_avatar || null,
+            email: student.student_email || undefined,
+            phone: student.student_phone || undefined,
+            enrolled_at: student.enrolled_at,
+            course_id: student.course_id,
+            course_title: student.course_title || 'Unknown Course',
             progress,
             completed_lessons: completedLessons || 0,
             total_lessons: totalLessons || 0,
+            // Guardian information
+            guardian_name: student.effective_guardian_name || student.guardian_name || null,
+            guardian_email: student.effective_guardian_email || student.guardian_email || null,
+            guardian_phone: student.effective_guardian_phone || student.guardian_phone || null,
+            guardian_address: student.effective_guardian_address || student.guardian_address || null,
+            guardian_relationship: student.guardian_relationship || null,
           };
         })
       );
@@ -213,6 +215,79 @@ const StudentManagement = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchStudentsManual = async () => {
+    // Fallback method if view doesn't exist
+    const { data: enrollments } = await supabase
+      .from('course_enrollments')
+      .select(`
+        user_id,
+        enrolled_at,
+        course_id,
+        courses (
+          id,
+          title
+        )
+      `)
+      .eq('course_id', selectedCourse)
+      .order('enrolled_at', { ascending: false });
+
+    if (!enrollments) {
+      setStudents([]);
+      setLoading(false);
+      return;
+    }
+
+    const studentIds = enrollments.map(e => e.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, email, phone, guardian_name, guardian_email, guardian_phone, guardian_address')
+      .in('id', studentIds);
+
+    const { count: totalLessons } = await supabase
+      .from('lessons')
+      .select('*', { count: 'exact', head: true })
+      .eq('course_id', selectedCourse);
+
+    const studentsWithData = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        const profile = profiles?.find(p => p.id === enrollment.user_id);
+        const course = enrollment.courses as any;
+
+        const { count: completedLessons } = await supabase
+          .from('learning_progress')
+          .select('*', { count: 'exact', head: true })
+          .eq('student_id', enrollment.user_id)
+          .eq('course_id', selectedCourse)
+          .eq('completed', true);
+
+        const progress = totalLessons && totalLessons > 0
+          ? Math.round(((completedLessons || 0) / totalLessons) * 100)
+          : 0;
+
+        return {
+          id: enrollment.user_id,
+          full_name: profile?.full_name || 'Unknown',
+          avatar_url: profile?.avatar_url || null,
+          email: profile?.email || undefined,
+          phone: profile?.phone || undefined,
+          enrolled_at: enrollment.enrolled_at,
+          course_id: enrollment.course_id,
+          course_title: course?.title || 'Unknown Course',
+          progress,
+          completed_lessons: completedLessons || 0,
+          total_lessons: totalLessons || 0,
+          guardian_name: profile?.guardian_name || null,
+          guardian_email: profile?.guardian_email || null,
+          guardian_phone: profile?.guardian_phone || null,
+          guardian_address: profile?.guardian_address || null,
+        };
+      })
+    );
+
+    setStudents(studentsWithData);
+    setLoading(false);
   };
 
   const filteredStudents = students.filter(student =>
@@ -348,6 +423,7 @@ const StudentManagement = () => {
                     <TableRow>
                       <TableHead>Student</TableHead>
                       <TableHead>Contact</TableHead>
+                      <TableHead>Guardian</TableHead>
                       <TableHead>Enrollment Date</TableHead>
                       <TableHead>Progress</TableHead>
                       <TableHead>Lessons</TableHead>
@@ -386,6 +462,34 @@ const StudentManagement = () => {
                                 <Phone className="h-3 w-3" />
                                 <span className="text-muted-foreground">{student.phone}</span>
                               </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1 min-w-[200px]">
+                            {student.guardian_name ? (
+                              <>
+                                <div className="font-medium text-sm">{student.guardian_name}</div>
+                                {student.guardian_relationship && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {student.guardian_relationship}
+                                  </Badge>
+                                )}
+                                {student.guardian_email && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Mail className="h-3 w-3" />
+                                    {student.guardian_email}
+                                  </div>
+                                )}
+                                {student.guardian_phone && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Phone className="h-3 w-3" />
+                                    {student.guardian_phone}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-sm text-muted-foreground italic">No guardian info</span>
                             )}
                           </div>
                         </TableCell>

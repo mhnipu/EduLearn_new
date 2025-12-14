@@ -28,6 +28,8 @@ import UploadContent from "./pages/library/UploadContent";
 import BookDetail from "./pages/library/BookDetail";
 import VideoDetail from "./pages/library/VideoDetail";
 import LessonManagement from "./pages/teacher/LessonManagement";
+import StudentManagement from "./pages/teacher/StudentManagement";
+import AttendanceManagement from "./pages/teacher/AttendanceManagement";
 import PendingApproval from "./pages/PendingApproval";
 import SuperAdminManagement from "./pages/admin/SuperAdminManagement";
 import SystemMonitoring from "./pages/admin/SystemMonitoring";
@@ -108,7 +110,7 @@ const App = () => (
               } />
               <Route path="/library/upload" element={
                 <ProtectedRoute 
-                  allowRoles={['super_admin', 'admin']}
+                  allowRoles={['super_admin', 'admin', 'teacher']}
                   requiredPermission={{ module: 'library', action: 'create' }}
                 >
                   <UploadContent />
@@ -128,7 +130,7 @@ const App = () => (
               {/* Admin Routes */}
               <Route path="/admin/courses/new" element={
                 <ProtectedRoute 
-                  allowRoles={['super_admin', 'admin']}
+                  allowRoles={['super_admin', 'admin', 'teacher']}
                   requiredPermission={{ module: 'courses', action: 'create' }}
                 >
                   <CreateCourse />
@@ -136,7 +138,7 @@ const App = () => (
               } />
               <Route path="/admin/courses/:courseId/edit" element={
                 <ProtectedRoute 
-                  allowRoles={['super_admin', 'admin']}
+                  allowRoles={['super_admin', 'admin', 'teacher']}
                   requiredPermission={{ module: 'courses', action: 'update' }}
                 >
                   <EditCourse />
@@ -144,7 +146,7 @@ const App = () => (
               } />
               <Route path="/admin/courses/:courseId/materials" element={
                 <ProtectedRoute 
-                  allowRoles={['super_admin', 'admin']}
+                  allowRoles={['super_admin', 'admin', 'teacher']}
                   requiredPermission={{ module: 'courses', action: 'update' }}
                 >
                   <CourseMaterials />
@@ -229,7 +231,7 @@ const App = () => (
               } />
               <Route path="/admin/assignments" element={
                 <ProtectedRoute 
-                  allowRoles={['super_admin', 'admin']}
+                  allowRoles={['super_admin', 'admin', 'teacher']}
                   requiredPermission={{ module: 'quizzes', action: 'read' }}
                 >
                   <AssignmentManagement />
@@ -237,7 +239,7 @@ const App = () => (
               } />
               <Route path="/admin/assignments/:assignmentId/submissions" element={
                 <ProtectedRoute 
-                  allowRoles={['super_admin', 'admin']}
+                  allowRoles={['super_admin', 'admin', 'teacher']}
                   requiredPermission={{ module: 'quizzes', action: 'read' }}
                 >
                   <AssignmentSubmissions />
@@ -248,6 +250,16 @@ const App = () => (
               <Route path="/teacher/courses/:courseId/lessons" element={
                 <ProtectedRoute allowRoles={['teacher', 'super_admin', 'admin']}>
                   <LessonManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/teacher/students" element={
+                <ProtectedRoute allowRoles={['teacher', 'super_admin', 'admin']}>
+                  <StudentManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/teacher/courses/:courseId/attendance" element={
+                <ProtectedRoute allowRoles={['teacher', 'super_admin', 'admin']}>
+                  <AttendanceManagement />
                 </ProtectedRoute>
               } />
               

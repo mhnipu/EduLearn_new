@@ -34,13 +34,30 @@ interface Assignment {
   is_active: boolean | null;
   created_at: string;
   category_id: string | null;
+  course_id: string | null;
+  assessment_type: string | null;
+  guidelines: string | null;
   submission_count?: number;
+  course_title?: string;
 }
 
 interface Category {
   id: string;
   name: string;
 }
+
+interface Course {
+  id: string;
+  title: string;
+}
+
+const ASSESSMENT_TYPES = [
+  { value: 'assignment', label: 'Assignment' },
+  { value: 'quiz', label: 'Quiz' },
+  { value: 'exam', label: 'Exam' },
+  { value: 'presentation', label: 'Presentation' },
+  { value: 'project', label: 'Project' },
+] as const;
 
 export default function AssignmentManagement() {
   const { user, role, loading: authLoading } = useAuth();
@@ -49,6 +66,7 @@ export default function AssignmentManagement() {
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
@@ -57,9 +75,13 @@ export default function AssignmentManagement() {
   // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [guidelines, setGuidelines] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [maxScore, setMaxScore] = useState(100);
+  const [dueTime, setDueTime] = useState('');
+  const [maxScore, setMaxScore] = useState<string>('100');
   const [categoryId, setCategoryId] = useState<string>('');
+  const [courseId, setCourseId] = useState<string>('');
+  const [assessmentType, setAssessmentType] = useState<string>('assignment');
   const [isActive, setIsActive] = useState(true);
 
   const canManage = role === 'admin' || role === 'super_admin' || role === 'teacher';
@@ -73,16 +95,97 @@ export default function AssignmentManagement() {
   useEffect(() => {
     if (user && canManage) {
       fetchData();
+      fetchCourses();
     }
   }, [user, canManage]);
 
+  const fetchCourses = async () => {
+    try {
+      if (role === 'teacher') {
+        // Fetch teacher's assigned courses
+        const { data: createdCourses } = await supabase
+          .from('courses')
+          .select('id, title')
+          .eq('created_by', user?.id)
+          .order('title');
+
+        const { data: assignedCoursesData } = await supabase
+          .from('teacher_course_assignments')
+          .select(`
+            course_id,
+            courses (
+              id,
+              title
+            )
+          `)
+          .eq('teacher_id', user?.id);
+
+        const assignedCourses = (assignedCoursesData || [])
+          .map((ac: any) => ac.courses)
+          .filter(Boolean);
+
+        const allCoursesMap = new Map<string, Course>();
+        (createdCourses || []).forEach(c => allCoursesMap.set(c.id, c));
+        assignedCourses.forEach((c: Course) => {
+          if (!allCoursesMap.has(c.id)) {
+            allCoursesMap.set(c.id, c);
+          }
+        });
+
+        setCourses(Array.from(allCoursesMap.values()));
+      } else {
+        // Admins can see all courses
+        const { data: allCourses } = await supabase
+          .from('courses')
+          .select('id, title')
+          .order('title');
+        if (allCourses) setCourses(allCourses);
+      }
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+    }
+  };
+
   const fetchData = async () => {
     try {
+      let assignmentsQuery = supabase
+        .from('assignments')
+        .select(`
+          *,
+          courses (
+            id,
+            title
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      // Filter by teacher's courses if teacher
+      if (role === 'teacher') {
+        const { data: teacherCourses } = await supabase
+          .from('teacher_course_assignments')
+          .select('course_id')
+          .eq('teacher_id', user?.id);
+
+        const { data: createdCourses } = await supabase
+          .from('courses')
+          .select('id')
+          .eq('created_by', user?.id);
+
+        const courseIds = [
+          ...(teacherCourses?.map(tc => tc.course_id) || []),
+          ...(createdCourses?.map(c => c.id) || [])
+        ];
+
+        if (courseIds.length > 0) {
+          assignmentsQuery = assignmentsQuery.in('course_id', courseIds);
+        } else {
+          // Teacher has no courses, show only their own assignments
+          assignmentsQuery = assignmentsQuery.eq('created_by', user?.id);
+        }
+      }
+
       const [assignmentsRes, categoriesRes] = await Promise.all([
-        supabase
-          .from('assignments')
-          .select('*')
-          .order('created_at', { ascending: false }),
+        assignmentsQuery,
         supabase.from('categories').select('id, name').order('name'),
       ]);
 
@@ -100,8 +203,9 @@ export default function AssignmentManagement() {
         });
 
         setAssignments(
-          assignmentsRes.data.map((a) => ({
+          assignmentsRes.data.map((a: any) => ({
             ...a,
+            course_title: a.courses?.title || null,
             submission_count: countMap[a.id] || 0,
           }))
         );
@@ -118,9 +222,13 @@ export default function AssignmentManagement() {
   const resetForm = () => {
     setTitle('');
     setDescription('');
+    setGuidelines('');
     setDueDate('');
-    setMaxScore(100);
+    setDueTime('');
+    setMaxScore('100');
     setCategoryId('');
+    setCourseId('');
+    setAssessmentType('assignment');
     setIsActive(true);
     setEditingAssignment(null);
   };
@@ -134,19 +242,27 @@ export default function AssignmentManagement() {
     setEditingAssignment(assignment);
     setTitle(assignment.title);
     setDescription(assignment.description || '');
-    // Format date for datetime-local input (YYYY-MM-DDTHH:mm)
+    setGuidelines(assignment.guidelines || '');
+    setAssessmentType(assignment.assessment_type || 'assignment');
+    setCourseId(assignment.course_id || '');
+    
+    // Format date and time separately
     if (assignment.due_date) {
       const date = new Date(assignment.due_date);
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
+      setDueDate(`${year}-${month}-${day}`);
+      
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
-      setDueDate(`${year}-${month}-${day}T${hours}:${minutes}`);
+      setDueTime(`${hours}:${minutes}`);
     } else {
       setDueDate('');
+      setDueTime('');
     }
-    setMaxScore(assignment.max_score || 100);
+    
+    setMaxScore(assignment.max_score?.toString() || '100');
     setCategoryId(assignment.category_id || '');
     setIsActive(assignment.is_active ?? true);
     setDialogOpen(true);
@@ -159,14 +275,47 @@ export default function AssignmentManagement() {
       return;
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AssignmentManagement.tsx:155',message:'handleSubmit entry',data:{title,dueDate,dueTime,maxScore,assessmentType,courseId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+
     setSaving(true);
     try {
+      // Combine date and time for due_date
+      let dueDateISO: string | null = null;
+      if (dueDate) {
+        if (dueTime) {
+          // Combine date and time
+          const dateTimeString = `${dueDate}T${dueTime}:00`;
+          dueDateISO = new Date(dateTimeString).toISOString();
+        } else {
+          // Only date, set to end of day
+          const dateTimeString = `${dueDate}T23:59:59`;
+          dueDateISO = new Date(dateTimeString).toISOString();
+        }
+      }
+
+      // Parse max_score safely
+      const maxScoreNum = maxScore ? parseInt(maxScore, 10) : 100;
+      if (isNaN(maxScoreNum) || maxScoreNum < 1) {
+        toast({ title: 'Max Score must be a valid number greater than 0', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AssignmentManagement.tsx:175',message:'payload before save',data:{dueDateISO,maxScoreNum,assessmentType,courseId:courseId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+
       const payload = {
         title: title.trim(),
         description: description.trim() || null,
-        due_date: dueDate ? new Date(dueDate).toISOString() : null,
-        max_score: maxScore,
+        guidelines: guidelines.trim() || null,
+        due_date: dueDateISO,
+        max_score: maxScoreNum,
         category_id: categoryId || null,
+        course_id: courseId || null,
+        assessment_type: assessmentType,
         is_active: isActive,
         created_by: user!.id,
       };
@@ -270,26 +419,89 @@ export default function AssignmentManagement() {
                     rows={3}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Assessment Type *</Label>
+                  <Select value={assessmentType} onValueChange={setAssessmentType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select assessment type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ASSESSMENT_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Course (Optional)</Label>
+                  <Select value={courseId || 'none'} onValueChange={(v) => setCourseId(v === 'none' ? '' : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select course" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No specific course</SelectItem>
+                      {courses.map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          {course.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="guidelines">Guidelines & Instructions</Label>
+                  <Textarea
+                    id="guidelines"
+                    value={guidelines}
+                    onChange={(e) => setGuidelines(e.target.value)}
+                    placeholder="Provide detailed guidelines, instructions, and requirements for students..."
+                    rows={4}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Clear instructions help students understand what is expected and how to participate
+                  </p>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dueDate">Due Date</Label>
                     <Input
                       id="dueDate"
-                      type="datetime-local"
+                      type="date"
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="maxScore">Max Score</Label>
+                    <Label htmlFor="dueTime">Due Time (Optional)</Label>
                     <Input
-                      id="maxScore"
-                      type="number"
-                      min="1"
-                      value={maxScore}
-                      onChange={(e) => setMaxScore(parseInt(e.target.value) || 100)}
+                      id="dueTime"
+                      type="time"
+                      value={dueTime}
+                      onChange={(e) => setDueTime(e.target.value)}
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="maxScore">Max Score</Label>
+                  <Input
+                    id="maxScore"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={maxScore}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || (!isNaN(Number(val)) && Number(val) >= 0)) {
+                        setMaxScore(val);
+                      }
+                    }}
+                    placeholder="100"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum points students can earn for this assessment
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Category</Label>
@@ -357,6 +569,17 @@ export default function AssignmentManagement() {
                           {assignment.description}
                         </p>
                       )}
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mb-2">
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {assignment.assessment_type || 'assignment'}
+                        </Badge>
+                        {assignment.course_title && (
+                          <span className="flex items-center gap-1">
+                            <FileText className="h-3 w-3" />
+                            {assignment.course_title}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         {assignment.due_date && (
                           <span className="flex items-center gap-1">
@@ -366,13 +589,18 @@ export default function AssignmentManagement() {
                         )}
                         <span className="flex items-center gap-1">
                           <CheckCircle className="h-3 w-3" />
-                          Max: {assignment.max_score} pts
+                          Max: {assignment.max_score || 100} pts
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-3 w-3" />
-                          {assignment.submission_count} submissions
+                          {assignment.submission_count || 0} submissions
                         </span>
                       </div>
+                      {assignment.guidelines && (
+                        <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                          <strong>Guidelines:</strong> {assignment.guidelines}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button

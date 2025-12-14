@@ -299,17 +299,31 @@ const TeacherDashboard = () => {
             <CardDescription>Common teaching tasks and shortcuts</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button 
-                onClick={() => navigate('/admin/courses/new')} 
-                className="h-auto py-6 justify-start group hover:shadow-lg transition-all bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                onClick={() => navigate('/teacher/students')} 
+                className="h-auto py-6 justify-start group hover:shadow-lg transition-all bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
               >
                 <div className="mr-3 h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                  <Plus className="h-6 w-6 text-white" />
+                  <Users className="h-6 w-6 text-white" />
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold text-white">Create Course</div>
-                  <div className="text-xs text-white/80">Start a new course</div>
+                  <div className="font-semibold text-white">My Students</div>
+                  <div className="text-xs text-white/80">View enrolled students</div>
+                </div>
+              </Button>
+
+              <Button 
+                onClick={() => navigate('/admin/assignments')} 
+                variant="outline" 
+                className="h-auto py-6 justify-start group hover:shadow-lg transition-all hover:border-blue-500/50"
+              >
+                <div className="mr-3 h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                  <FileText className="h-6 w-6 text-blue-500" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold text-foreground">Assignments</div>
+                  <div className="text-xs text-muted-foreground">Create & manage</div>
                 </div>
               </Button>
 
@@ -330,10 +344,10 @@ const TeacherDashboard = () => {
               <Button 
                 onClick={() => navigate('/courses')} 
                 variant="outline" 
-                className="h-auto py-6 justify-start group hover:shadow-lg transition-all hover:border-blue-500/50"
+                className="h-auto py-6 justify-start group hover:shadow-lg transition-all hover:border-green-500/50"
               >
-                <div className="mr-3 h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                  <Eye className="h-6 w-6 text-blue-500" />
+                <div className="mr-3 h-12 w-12 rounded-xl bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                  <Eye className="h-6 w-6 text-green-500" />
                 </div>
                 <div className="text-left">
                   <div className="font-semibold text-foreground">Browse Courses</div>

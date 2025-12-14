@@ -599,9 +599,6 @@ export default function EnrollmentManagement() {
           description: `Current courses: ${courseTitles}. Adding new course...`,
         });
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/e33281a0-d13e-4343-8c64-a145b2e5f5e8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EnrollmentManagement.tsx:handleCreateEnrollment:start',message:'Starting enrollment using RPC',data:{currentUserId:user?.id,selectedStudent,selectedCourse,userRole:role},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX',runId:'with-rpc'})}).catch(()=>{});
-      // #endregion
 
       // 1. Create student enrollment using secure RPC function
       const { data: enrollResult, error: enrollError } = await supabase
@@ -610,10 +607,6 @@ export default function EnrollmentManagement() {
           _course_id: selectedCourse,
           _admin_id: user?.id,
         });
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/e33281a0-d13e-4343-8c64-a145b2e5f5e8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EnrollmentManagement.tsx:handleCreateEnrollment:afterRPC',message:'RPC enrollment result',data:{hasError:!!enrollError,enrollResult,errorMessage:enrollError?.message,errorCode:enrollError?.code,errorDetails:enrollError?.details,errorHint:enrollError?.hint,fullError:enrollError?JSON.stringify(enrollError):null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'DB_CHECK',runId:'verify-sql'})}).catch(()=>{});
-      // #endregion
 
       if (enrollError) {
         throw enrollError;
@@ -632,10 +625,6 @@ export default function EnrollmentManagement() {
             _course_id: selectedCourse,
             _admin_id: user?.id,
           });
-
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/e33281a0-d13e-4343-8c64-a145b2e5f5e8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EnrollmentManagement.tsx:handleCreateEnrollment:afterTeacherRPC',message:'Teacher assignment result',data:{hasError:!!teacherError,teacherResult,errorMessage:teacherError?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX',runId:'with-rpc'})}).catch(()=>{});
-        // #endregion
 
         // Log warning if teacher assignment failed, but don't block enrollment
         if (teacherError || !teacherResult?.success) {

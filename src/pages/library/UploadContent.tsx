@@ -41,7 +41,7 @@ interface Category {
 }
 
 export default function UploadContent() {
-  const { user, role } = useAuth();
+  const { user, role, hasPermission, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -72,13 +72,21 @@ export default function UploadContent() {
   });
 
   useEffect(() => {
-    if (role !== 'admin' && role !== 'super_admin') {
-      navigate('/library');
-      toast({ title: 'Access denied. Only admins can upload content.', variant: 'destructive' });
-      return;
+    if (!authLoading) {
+      // Check if user has permission to create library content
+      const canUpload = role === 'super_admin' || hasPermission('library', 'create');
+      if (!canUpload) {
+        navigate('/library');
+        toast({ 
+          title: 'Access denied', 
+          description: 'You do not have permission to upload library content.',
+          variant: 'destructive' 
+        });
+        return;
+      }
+      fetchCategories();
     }
-    fetchCategories();
-  }, [role, navigate]);
+  }, [role, hasPermission, authLoading, navigate, toast]);
 
   const fetchCategories = async () => {
     const { data } = await supabase.from('categories').select('*').order('name');

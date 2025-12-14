@@ -44,6 +44,19 @@ interface Enrollment {
   progress_percentage: number;
 }
 
+interface GroupedEnrollment {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  enrollments: Enrollment[];
+  courses: Array<{ course_id: string; course_title: string; enrolled_at: string; completed_at: string | null; progress_percentage: number }>;
+  earliest_enrollment: string;
+  latest_enrollment: string;
+  total_courses: number;
+  completed_courses: number;
+  average_progress: number;
+}
+
 interface WaitlistEntry {
   id: string;
   course_id: string;
@@ -79,11 +92,18 @@ export default function EnrollmentManagement() {
   const { toast } = useToast();
   
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [groupedEnrollments, setGroupedEnrollments] = useState<GroupedEnrollment[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [selectedEnrollments, setSelectedEnrollments] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'enrollments' | 'waitlist'>('enrollments');
+  
+  // Multi-course assignment dialog
+  const [assignCoursesDialogOpen, setAssignCoursesDialogOpen] = useState(false);
+  const [selectedCoursesForAssignment, setSelectedCoursesForAssignment] = useState<Set<string>>(new Set());
+  const [isAssigningCourses, setIsAssigningCourses] = useState(false);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,6 +126,7 @@ export default function EnrollmentManagement() {
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [isCreatingEnrollment, setIsCreatingEnrollment] = useState(false);
+  const [existingCoursesForStudent, setExistingCoursesForStudent] = useState<string[]>([]);
   
   // Users by role
   const [students, setStudents] = useState<UserWithRole[]>([]);
@@ -212,7 +233,56 @@ export default function EnrollmentManagement() {
         })
       );
       setEnrollments(enrichedEnrollments);
+      
+      // Group enrollments by student
+      const grouped = groupEnrollmentsByStudent(enrichedEnrollments);
+      setGroupedEnrollments(grouped);
     }
+  };
+
+  const groupEnrollmentsByStudent = (enrollments: Enrollment[]): GroupedEnrollment[] => {
+    const groupedMap = new Map<string, Enrollment[]>();
+    
+    // Group by user_id
+    enrollments.forEach(enrollment => {
+      if (!groupedMap.has(enrollment.user_id)) {
+        groupedMap.set(enrollment.user_id, []);
+      }
+      groupedMap.get(enrollment.user_id)!.push(enrollment);
+    });
+    
+    // Convert to GroupedEnrollment array
+    return Array.from(groupedMap.entries()).map(([user_id, enrollments]) => {
+      const courses = enrollments.map(e => ({
+        course_id: e.course_id,
+        course_title: e.course_title,
+        enrolled_at: e.enrolled_at,
+        completed_at: e.completed_at,
+        progress_percentage: e.progress_percentage,
+      }));
+      
+      const enrollmentDates = enrollments.map(e => new Date(e.enrolled_at));
+      const earliest_enrollment = new Date(Math.min(...enrollmentDates.map(d => d.getTime()))).toISOString();
+      const latest_enrollment = new Date(Math.max(...enrollmentDates.map(d => d.getTime()))).toISOString();
+      
+      const completed_courses = enrollments.filter(e => e.completed_at).length;
+      const average_progress = enrollments.length > 0
+        ? Math.round(enrollments.reduce((sum, e) => sum + e.progress_percentage, 0) / enrollments.length)
+        : 0;
+      
+      return {
+        user_id,
+        user_name: enrollments[0].user_name,
+        user_email: enrollments[0].user_email,
+        enrollments,
+        courses,
+        earliest_enrollment,
+        latest_enrollment,
+        total_courses: enrollments.length,
+        completed_courses,
+        average_progress,
+      };
+    });
   };
 
   const fetchWaitlist = async () => {
@@ -277,6 +347,36 @@ export default function EnrollmentManagement() {
     });
   }, [enrollments, searchQuery, statusFilter, courseFilter, dateRange]);
 
+  const filteredGroupedEnrollments = useMemo(() => {
+    return groupedEnrollments.filter((grouped) => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = grouped.user_name.toLowerCase().includes(query);
+        const matchesCourse = grouped.courses.some(c => c.course_title.toLowerCase().includes(query));
+        if (!matchesName && !matchesCourse) return false;
+      }
+
+      if (statusFilter === 'active' && grouped.completed_courses === grouped.total_courses) return false;
+      if (statusFilter === 'completed' && grouped.completed_courses === 0) return false;
+
+      if (courseFilter !== 'all') {
+        const hasCourse = grouped.courses.some(c => c.course_id === courseFilter);
+        if (!hasCourse) return false;
+      }
+
+      if (dateRange.from) {
+        const enrolledDate = new Date(grouped.earliest_enrollment);
+        if (enrolledDate < dateRange.from) return false;
+      }
+      if (dateRange.to) {
+        const enrolledDate = new Date(grouped.latest_enrollment);
+        if (enrolledDate > dateRange.to) return false;
+      }
+
+      return true;
+    });
+  }, [groupedEnrollments, searchQuery, statusFilter, courseFilter, dateRange]);
+
   const filteredWaitlist = useMemo(() => {
     return waitlist.filter((entry) => {
       if (searchQuery) {
@@ -309,6 +409,24 @@ export default function EnrollmentManagement() {
     waitlistNotified: waitlist.filter(w => w.status === 'notified').length,
   }), [enrollments, waitlist]);
 
+  const toggleStudentSelection = (userId: string) => {
+    const newSelection = new Set(selectedStudents);
+    if (newSelection.has(userId)) {
+      newSelection.delete(userId);
+    } else {
+      newSelection.add(userId);
+    }
+    setSelectedStudents(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudents.size === filteredGroupedEnrollments.length) {
+      setSelectedStudents(new Set());
+    } else {
+      setSelectedStudents(new Set(filteredGroupedEnrollments.map(g => g.user_id)));
+    }
+  };
+
   const toggleEnrollmentSelection = (id: string) => {
     const newSelection = new Set(selectedEnrollments);
     if (newSelection.has(id)) {
@@ -319,26 +437,20 @@ export default function EnrollmentManagement() {
     setSelectedEnrollments(newSelection);
   };
 
-  const toggleSelectAll = () => {
-    if (selectedEnrollments.size === filteredEnrollments.length) {
-      setSelectedEnrollments(new Set());
-    } else {
-      setSelectedEnrollments(new Set(filteredEnrollments.map(e => e.id)));
-    }
-  };
-
   const handleBulkDelete = async () => {
-    if (selectedEnrollments.size === 0) return;
+    if (selectedStudents.size === 0) return;
 
+    const studentIds = Array.from(selectedStudents);
     const { error } = await supabase
       .from('course_enrollments')
       .delete()
-      .in('id', Array.from(selectedEnrollments));
+      .in('user_id', studentIds);
 
     if (error) {
       toast({ title: 'Failed to delete enrollments', variant: 'destructive' });
     } else {
-      toast({ title: `Deleted ${selectedEnrollments.size} enrollments` });
+      toast({ title: `Deleted all enrollments for ${selectedStudents.size} student(s)` });
+      setSelectedStudents(new Set());
       setSelectedEnrollments(new Set());
       fetchData();
     }
@@ -385,6 +497,75 @@ export default function EnrollmentManagement() {
     }
   };
 
+  const handleAssignCoursesToSelectedStudents = async () => {
+    if (selectedStudents.size === 0 || selectedCoursesForAssignment.size === 0) {
+      toast({ title: 'Please select at least one student and one course', variant: 'destructive' });
+      return;
+    }
+
+    setIsAssigningCourses(true);
+    try {
+      const studentIds = Array.from(selectedStudents);
+      const courseIds = Array.from(selectedCoursesForAssignment);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const studentId of studentIds) {
+        for (const courseId of courseIds) {
+          // Check if already enrolled
+          const { data: existing } = await supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('user_id', studentId)
+            .eq('course_id', courseId)
+            .single();
+
+          if (existing) {
+            continue; // Skip if already enrolled
+          }
+
+          const { data: enrollResult, error: enrollError } = await supabase
+            .rpc('admin_enroll_student', {
+              _student_id: studentId,
+              _course_id: courseId,
+              _admin_id: user?.id,
+            });
+
+          if (enrollError || !enrollResult?.success) {
+            errorCount++;
+            errors.push(enrollResult?.error || enrollError?.message || 'Unknown error');
+          } else {
+            successCount++;
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        toast({ 
+          title: `Successfully assigned ${successCount} course(s)`, 
+          description: errorCount > 0 ? `${errorCount} assignment(s) failed` : undefined
+        });
+      } else {
+        toast({ 
+          title: 'Failed to assign courses', 
+          description: errors[0] || 'All assignments failed',
+          variant: 'destructive' 
+        });
+      }
+
+      setAssignCoursesDialogOpen(false);
+      setSelectedCoursesForAssignment(new Set());
+      setSelectedStudents(new Set());
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error assigning courses', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsAssigningCourses(false);
+    }
+  };
+
   const handleCreateEnrollment = async () => {
     if (!selectedStudent || !selectedCourse) {
       toast({ title: 'Please select both student and course', variant: 'destructive' });
@@ -393,6 +574,31 @@ export default function EnrollmentManagement() {
 
     setIsCreatingEnrollment(true);
     try {
+      // Check if student already has enrollments
+      const { data: existingEnrollments } = await supabase
+        .from('course_enrollments')
+        .select('course_id, courses(title)')
+        .eq('user_id', selectedStudent);
+
+      const existingCourseIds = existingEnrollments?.map(e => e.course_id) || [];
+      
+      if (existingCourseIds.includes(selectedCourse)) {
+        toast({ 
+          title: 'Already enrolled', 
+          description: 'This student is already enrolled in the selected course.',
+          variant: 'destructive' 
+        });
+        setIsCreatingEnrollment(false);
+        return;
+      }
+
+      if (existingEnrollments && existingEnrollments.length > 0) {
+        const courseTitles = existingEnrollments.map((e: any) => e.courses?.title || 'Unknown').join(', ');
+        toast({
+          title: 'Student already enrolled in other courses',
+          description: `Current courses: ${courseTitles}. Adding new course...`,
+        });
+      }
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/e33281a0-d13e-4343-8c64-a145b2e5f5e8',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EnrollmentManagement.tsx:handleCreateEnrollment:start',message:'Starting enrollment using RPC',data:{currentUserId:user?.id,selectedStudent,selectedCourse,userRole:role},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX',runId:'with-rpc'})}).catch(()=>{});
       // #endregion
@@ -448,6 +654,7 @@ export default function EnrollmentManagement() {
       setSelectedStudent('');
       setSelectedCourse('');
       setSelectedTeacher('');
+      setExistingCoursesForStudent([]);
       fetchData();
     } catch (error: any) {
       console.error('Enrollment error:', error);
@@ -568,7 +775,33 @@ export default function EnrollmentManagement() {
                       <Users className="h-4 w-4 text-primary" />
                       Select Student *
                     </Label>
-                    <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+                    <Select 
+                      value={selectedStudent} 
+                      onValueChange={async (value) => {
+                        setSelectedStudent(value);
+                        setSelectedCourse('');
+                        // Fetch existing courses for this student
+                        if (value) {
+                          const { data: existingEnrollments } = await supabase
+                            .from('course_enrollments')
+                            .select('course_id, courses(title)')
+                            .eq('user_id', value);
+                          
+                          if (existingEnrollments) {
+                            setExistingCoursesForStudent(existingEnrollments.map((e: any) => e.course_id));
+                            if (existingEnrollments.length > 0) {
+                              const courseTitles = existingEnrollments.map((e: any) => e.courses?.title || 'Unknown').join(', ');
+                              toast({
+                                title: 'Student already enrolled',
+                                description: `Current courses: ${courseTitles}. You can add more courses below.`,
+                              });
+                            }
+                          }
+                        } else {
+                          setExistingCoursesForStudent([]);
+                        }
+                      }}
+                    >
                       <SelectTrigger id="student-select" className="h-11">
                         <SelectValue placeholder="Choose a student..." />
                       </SelectTrigger>
@@ -593,6 +826,11 @@ export default function EnrollmentManagement() {
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       {students.length} student(s) available
+                      {selectedStudent && existingCoursesForStudent.length > 0 && (
+                        <span className="block mt-1 text-primary">
+                          Already enrolled in {existingCoursesForStudent.length} course(s)
+                        </span>
+                      )}
                     </p>
                   </div>
 
@@ -612,14 +850,26 @@ export default function EnrollmentManagement() {
                               No courses available
                             </div>
                           ) : (
-                            courses.map((course) => (
-                              <SelectItem key={course.id} value={course.id}>
-                                <div className="flex items-center gap-2">
-                                  <BookOpen className="h-3 w-3 text-muted-foreground" />
-                                  {course.title}
-                                </div>
-                              </SelectItem>
-                            ))
+                            courses.map((course) => {
+                              const isAlreadyEnrolled = existingCoursesForStudent.includes(course.id);
+                              return (
+                                <SelectItem 
+                                  key={course.id} 
+                                  value={course.id}
+                                  disabled={isAlreadyEnrolled}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <BookOpen className="h-3 w-3 text-muted-foreground" />
+                                    {course.title}
+                                    {isAlreadyEnrolled && (
+                                      <Badge variant="outline" className="ml-2 text-xs">
+                                        Already enrolled
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              );
+                            })
                           )}
                         </ScrollArea>
                       </SelectContent>
@@ -670,6 +920,7 @@ export default function EnrollmentManagement() {
                       setSelectedStudent('');
                       setSelectedCourse('');
                       setSelectedTeacher('');
+                      setExistingCoursesForStudent([]);
                     }}
                     disabled={isCreatingEnrollment}
                   >
@@ -893,22 +1144,109 @@ export default function EnrollmentManagement() {
                   </div>
                 </div>
 
-                {selectedEnrollments.size > 0 && (
+                {selectedStudents.size > 0 && (
                   <div className="flex items-center gap-4 mt-4 p-3 bg-muted rounded-lg">
                     <span className="text-sm font-medium">
-                      {selectedEnrollments.size} selected
+                      {selectedStudents.size} student(s) selected
                     </span>
                     <div className="flex gap-2">
+                      <Dialog open={assignCoursesDialogOpen} onOpenChange={setAssignCoursesDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="default" size="sm">
+                            <BookOpen className="h-4 w-4 mr-1" />
+                            Assign Additional Courses
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px]">
+                          <DialogHeader>
+                            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                              <BookOpen className="h-5 w-5 text-primary" />
+                              Assign Courses to Selected Students
+                            </DialogTitle>
+                            <DialogDescription>
+                              Select one or more courses to assign to {selectedStudents.size} selected student(s)
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-semibold">Select Courses *</Label>
+                              <ScrollArea className="h-[300px] border rounded-md p-4">
+                                {courses.length === 0 ? (
+                                  <div className="text-center text-sm text-muted-foreground py-8">
+                                    No courses available
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {courses.map((course) => (
+                                      <div key={course.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                          id={`course-${course.id}`}
+                                          checked={selectedCoursesForAssignment.has(course.id)}
+                                          onCheckedChange={(checked) => {
+                                            const newSelection = new Set(selectedCoursesForAssignment);
+                                            if (checked) {
+                                              newSelection.add(course.id);
+                                            } else {
+                                              newSelection.delete(course.id);
+                                            }
+                                            setSelectedCoursesForAssignment(newSelection);
+                                          }}
+                                        />
+                                        <Label
+                                          htmlFor={`course-${course.id}`}
+                                          className="text-sm font-normal cursor-pointer flex-1"
+                                        >
+                                          {course.title}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </ScrollArea>
+                              <p className="text-xs text-muted-foreground">
+                                {selectedCoursesForAssignment.size} course(s) selected
+                              </p>
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setAssignCoursesDialogOpen(false);
+                                setSelectedCoursesForAssignment(new Set());
+                              }}
+                              disabled={isAssigningCourses}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleAssignCoursesToSelectedStudents}
+                              disabled={isAssigningCourses || selectedCoursesForAssignment.size === 0}
+                            >
+                              {isAssigningCourses ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Assigning...
+                                </>
+                              ) : (
+                                <>
+                                  <BookOpen className="mr-2 h-4 w-4" />
+                                  Assign Courses
+                                </>
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                       <Button variant="outline" size="sm" onClick={handleBulkDelete}>
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <Mail className="h-4 w-4 mr-1" />
-                        Send Reminder
-                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedEnrollments(new Set())}>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setSelectedStudents(new Set());
+                      setSelectedEnrollments(new Set());
+                    }}>
                       Clear
                     </Button>
                   </div>
@@ -921,7 +1259,7 @@ export default function EnrollmentManagement() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Enrollments</CardTitle>
-                  <CardDescription>{filteredEnrollments.length} results</CardDescription>
+                  <CardDescription>{filteredGroupedEnrollments.length} student(s) • {filteredEnrollments.length} total enrollment(s)</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleExportCSV}>
                   <Download className="h-4 w-4 mr-1" />
@@ -936,12 +1274,12 @@ export default function EnrollmentManagement() {
                         <TableRow>
                           <TableHead className="w-[40px]">
                             <Checkbox
-                              checked={selectedEnrollments.size === filteredEnrollments.length && filteredEnrollments.length > 0}
+                              checked={selectedStudents.size === filteredGroupedEnrollments.length && filteredGroupedEnrollments.length > 0}
                               onCheckedChange={toggleSelectAll}
                             />
                           </TableHead>
                           <TableHead>Student</TableHead>
-                          <TableHead>Course</TableHead>
+                          <TableHead>Courses ({filteredGroupedEnrollments.reduce((sum, g) => sum + g.total_courses, 0)})</TableHead>
                           <TableHead>Enrolled</TableHead>
                           <TableHead>Progress</TableHead>
                           <TableHead>Status</TableHead>
@@ -949,33 +1287,74 @@ export default function EnrollmentManagement() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredEnrollments.map((enrollment) => (
-                          <TableRow key={enrollment.id}>
+                        {filteredGroupedEnrollments.map((grouped) => (
+                          <TableRow key={grouped.user_id}>
                             <TableCell>
                               <Checkbox
-                                checked={selectedEnrollments.has(enrollment.id)}
-                                onCheckedChange={() => toggleEnrollmentSelection(enrollment.id)}
+                                checked={selectedStudents.has(grouped.user_id)}
+                                onCheckedChange={() => toggleStudentSelection(grouped.user_id)}
                               />
                             </TableCell>
-                            <TableCell className="font-medium">{enrollment.user_name}</TableCell>
-                            <TableCell>{enrollment.course_title}</TableCell>
-                            <TableCell>{format(new Date(enrollment.enrolled_at), 'MMM d, yyyy')}</TableCell>
+                            <TableCell className="font-medium">
+                              <div>
+                                <div>{grouped.user_name}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {grouped.total_courses} course{grouped.total_courses !== 1 ? 's' : ''}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1.5 max-w-md">
+                                {grouped.courses.map((course, idx) => (
+                                  <Badge 
+                                    key={course.course_id} 
+                                    variant="outline" 
+                                    className="text-xs"
+                                    title={`Enrolled: ${format(new Date(course.enrolled_at), 'MMM d, yyyy')} • Progress: ${course.progress_percentage}%`}
+                                  >
+                                    <BookOpen className="h-3 w-3 mr-1" />
+                                    {course.course_title}
+                                    {course.completed_at && (
+                                      <CheckCircle className="h-3 w-3 ml-1 text-green-500" />
+                                    )}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="text-sm">{format(new Date(grouped.earliest_enrollment), 'MMM d, yyyy')}</span>
+                                {grouped.earliest_enrollment !== grouped.latest_enrollment && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Latest: {format(new Date(grouped.latest_enrollment), 'MMM d, yyyy')}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-primary transition-all"
-                                    style={{ width: `${enrollment.progress_percentage}%` }}
+                                    style={{ width: `${grouped.average_progress}%` }}
                                   />
                                 </div>
-                                <span className="text-xs text-muted-foreground">{enrollment.progress_percentage}%</span>
+                                <span className="text-xs text-muted-foreground">{grouped.average_progress}%</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {grouped.completed_courses}/{grouped.total_courses} completed
                               </div>
                             </TableCell>
                             <TableCell>
-                              {enrollment.completed_at ? (
+                              {grouped.completed_courses === grouped.total_courses ? (
                                 <Badge className="bg-green-500/10 text-green-500 border-green-500/30">
                                   <CheckCircle className="h-3 w-3 mr-1" />
-                                  Completed
+                                  All Completed
+                                </Badge>
+                              ) : grouped.completed_courses > 0 ? (
+                                <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  In Progress
                                 </Badge>
                               ) : (
                                 <Badge variant="outline">
@@ -992,12 +1371,21 @@ export default function EnrollmentManagement() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => navigate(`/courses/${enrollment.course_id}`)}>
-                                    View Course
+                                  <DropdownMenuItem onClick={() => {
+                                    if (grouped.courses.length > 0) {
+                                      navigate(`/courses/${grouped.courses[0].course_id}`);
+                                    }
+                                  }}>
+                                    View Courses
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>Send Reminder</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    setSelectedStudents(new Set([grouped.user_id]));
+                                    setAssignCoursesDialogOpen(true);
+                                  }}>
+                                    Assign More Courses
+                                  </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-destructive">Remove</DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive">Remove All</DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
@@ -1008,53 +1396,81 @@ export default function EnrollmentManagement() {
                   </ScrollArea>
                 ) : (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredEnrollments.map((enrollment) => (
-                      <Card key={enrollment.id} className="relative hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    {filteredGroupedEnrollments.map((grouped) => (
+                      <Card key={grouped.user_id} className="relative hover:shadow-xl transition-all duration-300 hover:scale-105">
                         <div className="absolute top-3 right-3">
                           <Checkbox
-                            checked={selectedEnrollments.has(enrollment.id)}
-                            onCheckedChange={() => toggleEnrollmentSelection(enrollment.id)}
+                            checked={selectedStudents.has(grouped.user_id)}
+                            onCheckedChange={() => toggleStudentSelection(grouped.user_id)}
                           />
                         </div>
                         <CardContent className="pt-6">
                           <div className="space-y-3">
                             <div>
-                              <p className="font-semibold">{enrollment.user_name}</p>
-                              <p className="text-sm text-muted-foreground">{enrollment.course_title}</p>
+                              <p className="font-semibold">{grouped.user_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {grouped.total_courses} course{grouped.total_courses !== 1 ? 's' : ''} enrolled
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium text-muted-foreground">Courses:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {grouped.courses.slice(0, 3).map((course) => (
+                                  <Badge key={course.course_id} variant="outline" className="text-xs">
+                                    {course.course_title}
+                                  </Badge>
+                                ))}
+                                {grouped.courses.length > 3 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{grouped.courses.length - 3} more
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Enrolled</span>
-                              <span>{format(new Date(enrollment.enrolled_at), 'MMM d, yyyy')}</span>
+                              <span>{format(new Date(grouped.earliest_enrollment), 'MMM d, yyyy')}</span>
                             </div>
 
                             <div>
                               <div className="flex justify-between text-xs mb-1">
-                                <span>Progress</span>
-                                <span>{enrollment.progress_percentage}%</span>
+                                <span>Average Progress</span>
+                                <span>{grouped.average_progress}%</span>
                               </div>
                               <div className="h-2 bg-muted rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-primary transition-all"
-                                  style={{ width: `${enrollment.progress_percentage}%` }}
+                                  style={{ width: `${grouped.average_progress}%` }}
                                 />
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {grouped.completed_courses}/{grouped.total_courses} completed
                               </div>
                             </div>
 
                             <div className="flex items-center justify-between">
-                              {enrollment.completed_at ? (
+                              {grouped.completed_courses === grouped.total_courses ? (
                                 <Badge className="bg-green-500/10 text-green-500 border-green-500/30">
                                   <CheckCircle className="h-3 w-3 mr-1" />
-                                  Completed
+                                  All Completed
                                 </Badge>
                               ) : (
                                 <Badge variant="outline">
                                   <Clock className="h-3 w-3 mr-1" />
-                                  Active
+                                  In Progress
                                 </Badge>
                               )}
-                              <Button variant="ghost" size="sm" onClick={() => navigate(`/courses/${enrollment.course_id}`)}>
-                                View
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                  setSelectedStudents(new Set([grouped.user_id]));
+                                  setAssignCoursesDialogOpen(true);
+                                }}
+                              >
+                                Add Course
                               </Button>
                             </div>
                           </div>
@@ -1064,7 +1480,7 @@ export default function EnrollmentManagement() {
                   </div>
                 )}
 
-                {filteredEnrollments.length === 0 && (
+                {filteredGroupedEnrollments.length === 0 && (
                   <div className="text-center py-12">
                     <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">No enrollments found</p>

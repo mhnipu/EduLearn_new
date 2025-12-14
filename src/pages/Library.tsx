@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { BookOpen, Video, Search, Upload, Download, Eye, Bookmark, Clock, Play, FileText, Edit } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { EditBookDialog } from '@/components/library/EditBookDialog';
 import { EditVideoDialog } from '@/components/library/EditVideoDialog';
@@ -51,7 +51,7 @@ interface VideoItem {
 import { detectVideoType, getVideoThumbnail } from '@/components/library/VideoPlayer';
 
 export default function Library() {
-  const { user, role } = useAuth();
+  const { user, role, hasPermission } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -87,83 +87,29 @@ export default function Library() {
   const fetchBooks = async () => {
     setLoading(true);
     
-    // For students, show only books assigned to their enrolled courses
-    if (role === 'student' && user) {
-      // Get enrolled courses
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select('course_id')
-        .eq('user_id', user.id);
-      
-      if (enrollments && enrollments.length > 0) {
-        const courseIds = enrollments.map(e => e.course_id);
-        
-        // Get books assigned to enrolled courses
-        const { data: bookLinks } = await supabase
-          .from('course_library_books')
-          .select('book_id')
-          .in('course_id', courseIds);
-        
-        if (bookLinks && bookLinks.length > 0) {
-          const bookIds = bookLinks.map(l => l.book_id);
-          console.log('📚 Student: Fetching books from enrolled courses. Book IDs:', bookIds);
-          
-          let query = supabase
-            .from('books')
-            .select('*')
-            .eq('is_active', true)
-            .in('id', bookIds);
-          
-          if (selectedCategory !== 'all') {
-            query = query.eq('category_id', selectedCategory);
-          }
-          
-          if (searchQuery) {
-            query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-          }
-          
-          const { data, error } = await query.order('created_at', { ascending: false });
-          
-          if (error) {
-            console.error('❌ Error fetching books for student:', error);
-            console.error('Error details:', {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              hint: error.hint
-            });
-            setBooks([]);
-          } else {
-            console.log('✅ Student: Fetched books:', data?.length || 0);
-            setBooks(data || []);
-          }
-        } else {
-          console.log('ℹ️ Student: No book links found for enrolled courses');
-          setBooks([]);
-        }
-      } else {
-        setBooks([]);
-      }
+    // RLS policies will automatically filter books based on permissions
+    // Only books with explicit permission will be visible
+    // Super Admin sees all, others see only what they have permission for
+    let query = supabase
+      .from('books')
+      .select('*')
+      .eq('is_active', true);
+
+    if (selectedCategory !== 'all') {
+      query = query.eq('category_id', selectedCategory);
+    }
+
+    if (searchQuery) {
+      query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching books:', error);
+      setBooks([]);
     } else {
-      // For admins/teachers, show all books
-      let query = supabase
-        .from('books')
-        .select('*')
-        .eq('is_active', true);
-
-      if (selectedCategory !== 'all') {
-        query = query.eq('category_id', selectedCategory);
-      }
-
-      if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (!error && data) {
-        setBooks(data);
-      }
+      setBooks(data || []);
     }
     
     setLoading(false);
@@ -172,83 +118,29 @@ export default function Library() {
   const fetchVideos = async () => {
     setLoading(true);
     
-    // For students, show only videos assigned to their enrolled courses
-    if (role === 'student' && user) {
-      // Get enrolled courses
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select('course_id')
-        .eq('user_id', user.id);
-      
-      if (enrollments && enrollments.length > 0) {
-        const courseIds = enrollments.map(e => e.course_id);
-        
-        // Get videos assigned to enrolled courses
-        const { data: videoLinks } = await supabase
-          .from('course_library_videos')
-          .select('video_id')
-          .in('course_id', courseIds);
-        
-        if (videoLinks && videoLinks.length > 0) {
-          const videoIds = videoLinks.map(l => l.video_id);
-          console.log('🎥 Student: Fetching videos from enrolled courses. Video IDs:', videoIds);
-          
-          let query = supabase
-            .from('videos')
-            .select('*')
-            .eq('is_active', true)
-            .in('id', videoIds);
-          
-          if (selectedCategory !== 'all') {
-            query = query.eq('category_id', selectedCategory);
-          }
-          
-          if (searchQuery) {
-            query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-          }
-          
-          const { data, error } = await query.order('created_at', { ascending: false });
-          
-          if (error) {
-            console.error('❌ Error fetching videos for student:', error);
-            console.error('Error details:', {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              hint: error.hint
-            });
-            setVideos([]);
-          } else {
-            console.log('✅ Student: Fetched videos:', data?.length || 0);
-            setVideos(data || []);
-          }
-        } else {
-          console.log('ℹ️ Student: No video links found for enrolled courses');
-          setVideos([]);
-        }
-      } else {
-        setVideos([]);
-      }
+    // RLS policies will automatically filter videos based on permissions
+    // Only videos with explicit permission will be visible
+    // Super Admin sees all, others see only what they have permission for
+    let query = supabase
+      .from('videos')
+      .select('*')
+      .eq('is_active', true);
+
+    if (selectedCategory !== 'all') {
+      query = query.eq('category_id', selectedCategory);
+    }
+
+    if (searchQuery) {
+      query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching videos:', error);
+      setVideos([]);
     } else {
-      // For admins/teachers, show all videos
-      let query = supabase
-        .from('videos')
-        .select('*')
-        .eq('is_active', true);
-
-      if (selectedCategory !== 'all') {
-        query = query.eq('category_id', selectedCategory);
-      }
-
-      if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (!error && data) {
-        setVideos(data);
-      }
+      setVideos(data || []);
     }
     
     setLoading(false);
@@ -279,7 +171,9 @@ export default function Library() {
     }
   };
 
-  const canUpload = role === 'admin' || role === 'super_admin';
+  // Check if user has permission to upload/create library content
+  const canUpload = role === 'super_admin' || hasPermission('library', 'create');
+  const canEdit = role === 'super_admin' || hasPermission('library', 'update');
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -288,7 +182,11 @@ export default function Library() {
           <h1 className="text-4xl font-bold mb-2">Smart E-Library</h1>
           <p className="text-muted-foreground">
             {role === 'student' 
-              ? 'Access books and videos from your enrolled courses'
+              ? 'Access books and videos granted by administrators'
+              : role === 'teacher'
+              ? 'Access books and videos granted by administrators'
+              : role === 'admin'
+              ? 'Access books and videos based on your permissions'
               : 'Explore books, videos, and learning materials'}
           </p>
         </div>
@@ -409,7 +307,7 @@ export default function Library() {
                     >
                       View
                     </Button>
-                    {canUpload && (
+                    {canEdit && (
                       <Button
                         variant="outline"
                         size="icon"
@@ -527,7 +425,7 @@ export default function Library() {
                       >
                         Watch
                       </Button>
-                      {canUpload && (
+                      {canEdit && (
                         <Button
                           variant="outline"
                           size="icon"

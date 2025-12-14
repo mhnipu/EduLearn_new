@@ -5,12 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GraduationCap, Info, Mail, Phone } from 'lucide-react';
+import { GraduationCap, Mail, Phone, Eye, EyeOff, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Progress } from '@/components/ui/progress';
+import { supabase } from '@/integrations/supabase/client';
 
 const DEFAULT_SUPER_ADMIN_EMAIL = 'super@gmail.com';
 
@@ -41,19 +42,54 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 });
 
+// Password strength calculation
+const calculatePasswordStrength = (password: string): { strength: number; label: string; color: string } => {
+  if (!password) return { strength: 0, label: '', color: '' };
+  
+  let strength = 0;
+  if (password.length >= 6) strength += 20;
+  if (password.length >= 8) strength += 10;
+  if (password.length >= 12) strength += 10;
+  if (/[a-z]/.test(password)) strength += 15;
+  if (/[A-Z]/.test(password)) strength += 15;
+  if (/[0-9]/.test(password)) strength += 15;
+  if (/[^a-zA-Z0-9]/.test(password)) strength += 15;
+  
+  let label = '';
+  let color = '';
+  if (strength < 40) {
+    label = 'Weak';
+    color = 'bg-red-500';
+  } else if (strength < 70) {
+    label = 'Fair';
+    color = 'bg-yellow-500';
+  } else if (strength < 90) {
+    label = 'Good';
+    color = 'bg-blue-500';
+  } else {
+    label = 'Strong';
+    color = 'bg-green-500';
+  }
+  
+  return { strength, label, color };
+};
+
 export default function AuthEnhanced() {
   const [isLoading, setIsLoading] = useState(false);
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [password, setPassword] = useState('');
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
   const { signIn, signInWithPhone, signUp, user, role, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  const passwordStrength = calculatePasswordStrength(password);
 
-  // Show connection status on mount
-  useEffect(() => {
-    console.log('🌐 Auth Page Loaded');
-    console.log('📡 Connected to Supabase:', import.meta.env.VITE_SUPABASE_URL);
-    console.log('🔑 Using external Supabase database (NOT Lovable cloud)');
-  }, []);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -256,6 +292,50 @@ export default function AuthEnhanced() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSendingReset(true);
+    
+    try {
+      const email = forgotPasswordEmail.trim().toLowerCase();
+      if (!email) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Please enter your email address',
+        });
+        return;
+      }
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+      
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: 'Password reset email sent',
+          description: 'Check your email for password reset instructions.',
+        });
+        setShowForgotPassword(false);
+        setForgotPasswordEmail('');
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to send reset email',
+      });
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
       <Card className="w-full max-w-md border-2">
@@ -268,14 +348,18 @@ export default function AuthEnhanced() {
           <CardTitle className="text-2xl">Welcome to EduLearn</CardTitle>
           <CardDescription>
             Sign in to your account or create a new one
-            <br />
-            <span className="text-xs text-muted-foreground mt-1 block">
-              🔒 Using External Supabase Database
-            </span>
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs 
+            defaultValue="login" 
+            className="w-full"
+            onValueChange={() => {
+              setPassword('');
+              setShowForgotPassword(false);
+              setForgotPasswordEmail('');
+            }}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -328,15 +412,78 @@ export default function AuthEnhanced() {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input
-                      id="login-password"
-                      name="password"
-                      type="password"
-                      placeholder="••••••••"
-                      required
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="login-password">Password</Label>
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPassword(!showForgotPassword)}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        name="password"
+                        type={showLoginPassword ? 'text' : 'password'}
+                        placeholder="password"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showLoginPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
+                  
+                  {showForgotPassword && (
+                    <div className="p-4 border rounded-lg bg-muted/50 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-primary" />
+                        <Label className="text-sm font-medium">Reset Password</Label>
+                      </div>
+                      <form onSubmit={handleForgotPassword} className="space-y-2">
+                        <Input
+                          type="email"
+                          placeholder="Enter your email"
+                          value={forgotPasswordEmail}
+                          onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                          required
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            type="submit"
+                            size="sm"
+                            className="flex-1"
+                            disabled={isSendingReset}
+                          >
+                            {isSendingReset ? 'Sending...' : 'Send Reset Link'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setShowForgotPassword(false);
+                              setForgotPasswordEmail('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                  
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? 'Signing in...' : 'Sign In'}
                   </Button>
@@ -346,19 +493,13 @@ export default function AuthEnhanced() {
             
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
-                <Alert className="bg-muted/50">
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    After signup, your data will be saved to <strong>external Supabase</strong> (not Lovable cloud). An administrator will assign your role.
-                  </AlertDescription>
-                </Alert>
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Full Name</Label>
                   <Input
                     id="signup-name"
                     name="fullName"
                     type="text"
-                    placeholder="John Doe"
+                    placeholder="Name"
                     required
                   />
                 </div>
@@ -383,23 +524,83 @@ export default function AuthEnhanced() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    required
-                  />
+                  <p className="text-xs text-muted-foreground">Password must be 6 digit</p>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="password"
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  {password && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Password strength</span>
+                        <span className={`font-medium ${
+                          passwordStrength.strength < 40 ? 'text-red-500' :
+                          passwordStrength.strength < 70 ? 'text-yellow-500' :
+                          passwordStrength.strength < 90 ? 'text-blue-500' : 'text-green-500'
+                        }`}>
+                          {passwordStrength.label}
+                        </span>
+                      </div>
+                      <Progress value={passwordStrength.strength} className="h-2" />
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className={`flex items-center gap-1 ${password.length >= 8 ? 'text-green-600' : ''}`}>
+                          {password.length >= 8 ? '✓' : '○'} At least 8 characters
+                        </div>
+                        <div className={`flex items-center gap-1 ${/[a-z]/.test(password) && /[A-Z]/.test(password) ? 'text-green-600' : ''}`}>
+                          {/[a-z]/.test(password) && /[A-Z]/.test(password) ? '✓' : '○'} Upper and lowercase letters
+                        </div>
+                        <div className={`flex items-center gap-1 ${/[0-9]/.test(password) ? 'text-green-600' : ''}`}>
+                          {/[0-9]/.test(password) ? '✓' : '○'} At least one number
+                        </div>
+                        <div className={`flex items-center gap-1 ${/[^a-zA-Z0-9]/.test(password) ? 'text-green-600' : ''}`}>
+                          {/[^a-zA-Z0-9]/.test(password) ? '✓' : '○'} At least one special character
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-confirm">Confirm Password</Label>
-                  <Input
-                    id="signup-confirm"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="signup-confirm"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="confirm password"
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Creating account...' : 'Create Account'}

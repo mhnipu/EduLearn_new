@@ -125,6 +125,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('🔐 Auth Event:', event, 'Session:', session ? 'Active' : 'None');
         console.log('📡 Using Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
 
+        // Handle sign out event - force redirect
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setSession(null);
+          setRole(null);
+          setRoles([]);
+          setPermissions([]);
+          // Force redirect to auth page
+          if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+            window.location.href = '/auth';
+          }
+          return;
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -139,6 +153,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setRole(null);
           setRoles([]);
           setPermissions([]);
+          // If no session and not on public pages, redirect to auth
+          if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+            window.location.href = '/auth';
+          }
         }
       }
     );
@@ -257,19 +275,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     console.log('🚪 Signing out from external Supabase...');
-    await supabase.auth.signOut();
     
+    // Clear all state first
     setUser(null);
     setSession(null);
     setRole(null);
     setRoles([]);
     setPermissions([]);
+    
+    // Sign out from Supabase
+    await supabase.auth.signOut();
+    
+    // Force redirect to auth page - this ensures user cannot access protected routes
+    window.location.href = '/auth';
+    
     console.log('✅ Signed out successfully');
   };
 
-  const hasPermission = (moduleName: string, permission: 'create' | 'read' | 'update' | 'delete'): boolean => {
+  const hasPermission = (
+    moduleName: string, 
+    permission: 'create' | 'read' | 'update' | 'delete' | 'assign' | 'approve'
+  ): boolean => {
     // Super admins have all permissions
     if (role === 'super_admin') return true;
+    
+    // If no role, no permissions
+    if (!role) return false;
     
     const modulePerms = permissions.find(p => p.module_name === moduleName);
     if (!modulePerms) return false;
@@ -279,6 +310,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       case 'read': return modulePerms.can_read;
       case 'update': return modulePerms.can_update;
       case 'delete': return modulePerms.can_delete;
+      // For assign and approve, check if user has update permission (can be extended later)
+      case 'assign': return modulePerms.can_update || modulePerms.can_create;
+      case 'approve': return modulePerms.can_update || modulePerms.can_delete;
       default: return false;
     }
   };

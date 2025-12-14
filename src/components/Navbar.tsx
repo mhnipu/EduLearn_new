@@ -105,7 +105,14 @@ export const Navbar = () => {
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut} className="cursor-pointer">
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      await signOut();
+                      // signOut already redirects, but ensure it happens
+                      window.location.href = '/auth';
+                    }} 
+                    className="cursor-pointer"
+                  >
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
                   </DropdownMenuItem>

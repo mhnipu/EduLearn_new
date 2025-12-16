@@ -297,6 +297,9 @@ export default function UploadContent() {
                         label="Drop PDF here"
                         description="or click to browse"
                         maxSizeMB={50}
+                        onValidationError={(error) => {
+                          toast({ title: 'File Validation Error', description: error, variant: 'destructive' });
+                        }}
                       />
                       {generatingThumbnail && (
                         <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
@@ -457,6 +460,9 @@ export default function UploadContent() {
                           label="Drop video here"
                           description="MP4, WebM, and other formats"
                           maxSizeMB={500}
+                          onValidationError={(error) => {
+                            toast({ title: 'File Validation Error', description: error, variant: 'destructive' });
+                          }}
                         />
                       </div>
                     )}

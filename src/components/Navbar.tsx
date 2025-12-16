@@ -41,7 +41,7 @@ export const Navbar = () => {
                   </Button>
                 </Link>
                 <Link to="/library">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" data-testid="library-button" aria-label="Library">
                     <Library className="h-4 w-4 mr-2" />
                     Library
                   </Button>
@@ -55,7 +55,13 @@ export const Navbar = () => {
               </>
             )}
 
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleTheme}
+              data-testid="theme-toggle-button"
+              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            >
               {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             </Button>
 

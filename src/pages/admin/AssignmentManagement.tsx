@@ -22,8 +22,16 @@ import {
   Users,
   CheckCircle,
   Clock,
+  Settings,
+  AlertCircle,
+  ListChecks,
+  Download,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { FileDropzone } from '@/components/library/FileDropzone';
 
 interface Assignment {
   id: string;
@@ -37,6 +45,9 @@ interface Assignment {
   course_id: string | null;
   assessment_type: string | null;
   guidelines: string | null;
+  late_submission_allowed: boolean | null;
+  late_penalty_per_day: number | null;
+  attachment_url: string | null;
   submission_count?: number;
   course_title?: string;
 }
@@ -83,6 +94,10 @@ export default function AssignmentManagement() {
   const [courseId, setCourseId] = useState<string>('');
   const [assessmentType, setAssessmentType] = useState<string>('assignment');
   const [isActive, setIsActive] = useState(true);
+  const [lateSubmissionAllowed, setLateSubmissionAllowed] = useState(true);
+  const [latePenaltyPerDay, setLatePenaltyPerDay] = useState<string>('0');
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
 
   const canManage = role === 'admin' || role === 'super_admin' || role === 'teacher';
 
@@ -109,7 +124,8 @@ export default function AssignmentManagement() {
           .eq('created_by', user?.id)
           .order('title');
 
-        const { data: assignedCoursesData } = await supabase
+        // teacher_course_assignments table exists but types may not be up to date
+        const { data: assignedCoursesData } = await (supabase as any)
           .from('teacher_course_assignments')
           .select(`
             course_id,
@@ -151,7 +167,20 @@ export default function AssignmentManagement() {
       let assignmentsQuery = supabase
         .from('assignments')
         .select(`
-          *,
+          id,
+          title,
+          description,
+          due_date,
+          max_score,
+          is_active,
+          created_at,
+          category_id,
+          course_id,
+          assessment_type,
+          guidelines,
+          late_submission_allowed,
+          late_penalty_per_day,
+          attachment_url,
           courses (
             id,
             title
@@ -161,7 +190,8 @@ export default function AssignmentManagement() {
 
       // Filter by teacher's courses if teacher
       if (role === 'teacher') {
-        const { data: teacherCourses } = await supabase
+        // teacher_course_assignments table exists but types may not be up to date
+        const { data: teacherCourses } = await (supabase as any)
           .from('teacher_course_assignments')
           .select('course_id')
           .eq('teacher_id', user?.id);
@@ -172,11 +202,12 @@ export default function AssignmentManagement() {
           .eq('created_by', user?.id);
 
         const courseIds = [
-          ...(teacherCourses?.map(tc => tc.course_id) || []),
-          ...(createdCourses?.map(c => c.id) || [])
+          ...(teacherCourses?.map((tc: any) => tc.course_id) || []),
+          ...(createdCourses?.map((c: any) => c.id) || [])
         ];
 
         if (courseIds.length > 0) {
+          // @ts-expect-error - Supabase type complexity with nested queries
           assignmentsQuery = assignmentsQuery.in('course_id', courseIds);
         } else {
           // Teacher has no courses, show only their own assignments
@@ -189,9 +220,9 @@ export default function AssignmentManagement() {
         supabase.from('categories').select('id, name').order('name'),
       ]);
 
-      if (assignmentsRes.data) {
+      if (assignmentsRes.data && !assignmentsRes.error) {
         // Fetch submission counts
-        const assignmentIds = assignmentsRes.data.map((a) => a.id);
+        const assignmentIds = (assignmentsRes.data as any[]).map((a: any) => a.id);
         const { data: submissions } = await supabase
           .from('assignment_submissions')
           .select('assignment_id')
@@ -230,6 +261,10 @@ export default function AssignmentManagement() {
     setCourseId('');
     setAssessmentType('assignment');
     setIsActive(true);
+    setLateSubmissionAllowed(true);
+    setLatePenaltyPerDay('0');
+    setAttachmentFile(null);
+    setAttachmentUrl(null);
     setEditingAssignment(null);
   };
 
@@ -245,6 +280,8 @@ export default function AssignmentManagement() {
     setGuidelines(assignment.guidelines || '');
     setAssessmentType(assignment.assessment_type || 'assignment');
     setCourseId(assignment.course_id || '');
+    setAttachmentUrl(assignment.attachment_url || null);
+    setAttachmentFile(null);
     
     // Format date and time separately
     if (assignment.due_date) {
@@ -265,6 +302,8 @@ export default function AssignmentManagement() {
     setMaxScore(assignment.max_score?.toString() || '100');
     setCategoryId(assignment.category_id || '');
     setIsActive(assignment.is_active ?? true);
+    setLateSubmissionAllowed(assignment.late_submission_allowed ?? true);
+    setLatePenaltyPerDay(assignment.late_penalty_per_day?.toString() || '0');
     setDialogOpen(true);
   };
 
@@ -274,10 +313,6 @@ export default function AssignmentManagement() {
       toast({ title: 'Title is required', variant: 'destructive' });
       return;
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AssignmentManagement.tsx:155',message:'handleSubmit entry',data:{title,dueDate,dueTime,maxScore,assessmentType,courseId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
 
     setSaving(true);
     try {
@@ -303,9 +338,41 @@ export default function AssignmentManagement() {
         return;
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AssignmentManagement.tsx:175',message:'payload before save',data:{dueDateISO,maxScoreNum,assessmentType,courseId:courseId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
+      // Parse late penalty
+      const latePenaltyNum = latePenaltyPerDay ? parseInt(latePenaltyPerDay, 10) : 0;
+      if (isNaN(latePenaltyNum) || latePenaltyNum < 0 || latePenaltyNum > 100) {
+        toast({ title: 'Late penalty must be between 0 and 100', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
+      // Handle file upload
+      let finalAttachmentUrl = attachmentUrl;
+      
+      // For editing, upload file before updating
+      if (attachmentFile && editingAssignment) {
+        const fileExt = attachmentFile.name.split('.').pop();
+        if (!fileExt) {
+          throw new Error('File must have an extension');
+        }
+        
+        const fileName = `assignments/${user!.id}/${editingAssignment.id}/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('library-files')
+          .upload(fileName, attachmentFile, { upsert: true });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error(`Failed to upload file: ${uploadError.message}`);
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('library-files')
+          .getPublicUrl(fileName);
+
+        finalAttachmentUrl = urlData?.publicUrl || null;
+      }
 
       const payload = {
         title: title.trim(),
@@ -317,19 +384,59 @@ export default function AssignmentManagement() {
         course_id: courseId || null,
         assessment_type: assessmentType,
         is_active: isActive,
+        late_submission_allowed: lateSubmissionAllowed,
+        late_penalty_per_day: latePenaltyNum,
+        attachment_url: finalAttachmentUrl,
         created_by: user!.id,
       };
 
+      let assignmentId: string;
       if (editingAssignment) {
         const { error } = await supabase
           .from('assignments')
           .update(payload)
           .eq('id', editingAssignment.id);
         if (error) throw error;
+        assignmentId = editingAssignment.id;
         toast({ title: 'Assignment updated successfully' });
       } else {
-        const { error } = await supabase.from('assignments').insert(payload);
+        // For new assignments, create first, then upload file
+        const { data, error } = await supabase.from('assignments').insert(payload).select('id').single();
         if (error) throw error;
+        assignmentId = data.id;
+        
+        // Now upload file to assignment-specific folder
+        if (attachmentFile) {
+          const fileExt = attachmentFile.name.split('.').pop();
+          if (!fileExt) {
+            throw new Error('File must have an extension');
+          }
+          
+          const fileName = `assignments/${user!.id}/${assignmentId}/${Date.now()}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('library-files')
+            .upload(fileName, attachmentFile, { upsert: true });
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            // Don't fail the assignment creation if upload fails, just log it
+            toast({ title: 'Assignment created but file upload failed', variant: 'destructive' });
+          } else {
+            const { data: urlData } = supabase.storage
+              .from('library-files')
+              .getPublicUrl(fileName);
+
+            if (urlData?.publicUrl) {
+              // Update assignment with attachment URL
+              await supabase
+                .from('assignments')
+                .update({ attachment_url: urlData.publicUrl })
+                .eq('id', assignmentId);
+            }
+          }
+        }
+        
         toast({ title: 'Assignment created successfully' });
       }
 
@@ -394,147 +501,317 @@ export default function AssignmentManagement() {
                 New Assignment
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingAssignment ? 'Edit Assignment' : 'Create Assignment'}</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title *</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Assignment title"
-                    required
-                  />
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <Tabs defaultValue="basic" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                    <TabsTrigger value="settings">Settings</TabsTrigger>
+                    <TabsTrigger value="grading">Grading</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="basic" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Title *</Label>
+                      <Input
+                        id="title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Assignment title"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Assessment Type *</Label>
+                      <Select value={assessmentType} onValueChange={setAssessmentType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select assessment type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ASSESSMENT_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Course (Optional)</Label>
+                      <Select value={courseId || 'none'} onValueChange={(v) => setCourseId(v === 'none' ? '' : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select course" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No specific course</SelectItem>
+                          {courses.map((course) => (
+                            <SelectItem key={course.id} value={course.id}>
+                              {course.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select value={categoryId || 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? '' : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No category</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Assignment instructions..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="guidelines">Guidelines & Instructions</Label>
+                      <Textarea
+                        id="guidelines"
+                        value={guidelines}
+                        onChange={(e) => setGuidelines(e.target.value)}
+                        placeholder="Provide detailed guidelines, instructions, and requirements for students..."
+                        rows={4}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Clear instructions help students understand what is expected and how to participate
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="dueDate">Due Date</Label>
+                        <Input
+                          id="dueDate"
+                          type="date"
+                          value={dueDate}
+                          onChange={(e) => setDueDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dueTime">Due Time (Optional)</Label>
+                        <Input
+                          id="dueTime"
+                          type="time"
+                          value={dueTime}
+                          onChange={(e) => setDueTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Attachment (Optional)</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Upload supporting files (PDF, PPT, DOC, etc.) for students to download
+                      </p>
+                      {attachmentUrl && !attachmentFile && (
+                        <div className="mb-3 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">Current attachment</span>
+                            <a
+                              href={attachmentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:underline flex items-center gap-1"
+                            >
+                              <Download className="h-3 w-3" />
+                              Download
+                            </a>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setAttachmentUrl(null)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      )}
+                      <FileDropzone
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        maxSizeMB={20}
+                        selectedFile={attachmentFile}
+                        onFileSelect={setAttachmentFile}
+                        onClear={() => setAttachmentFile(null)}
+                        label="Upload file"
+                        description="PDF, Word, PowerPoint (Max 20MB)"
+                        onValidationError={(error) => {
+                          toast({ title: error, variant: 'destructive' });
+                        }}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="settings" className="space-y-4 mt-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="isActive" className="text-base font-medium cursor-pointer">
+                            Active Status
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            Make this assignment visible to students
+                          </p>
+                        </div>
+                        <Switch
+                          id="isActive"
+                          checked={isActive}
+                          onCheckedChange={setIsActive}
+                        />
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-4 p-4 border rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                          <Label className="text-base font-medium">Late Submission Policy</Label>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="lateAllowed" className="cursor-pointer">
+                              Allow Late Submissions
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Students can submit after the due date
+                            </p>
+                          </div>
+                          <Switch
+                            id="lateAllowed"
+                            checked={lateSubmissionAllowed}
+                            onCheckedChange={setLateSubmissionAllowed}
+                          />
+                        </div>
+
+                        {lateSubmissionAllowed && (
+                          <div className="space-y-2 pt-2 border-t">
+                            <Label htmlFor="latePenalty">
+                              Penalty Per Day (%)
+                            </Label>
+                            <Input
+                              id="latePenalty"
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={latePenaltyPerDay}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || (!isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100)) {
+                                  setLatePenaltyPerDay(val);
+                                }
+                              }}
+                              placeholder="0"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Percentage of score deducted per day late (0-100). 
+                              Example: 5% per day means 5 points deducted from a 100-point assignment for each day late.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="grading" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="maxScore">Max Score</Label>
+                      <Input
+                        id="maxScore"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={maxScore}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || (!isNaN(Number(val)) && Number(val) >= 0)) {
+                            setMaxScore(val);
+                          }
+                        }}
+                        placeholder="100"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Maximum points students can earn for this assessment
+                      </p>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-4 p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ListChecks className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-base font-medium">Rubric Criteria</Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Create rubric criteria for detailed grading. You can add criteria after creating the assignment.
+                      </p>
+                      {editingAssignment && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setDialogOpen(false);
+                            // Navigate to rubric management (we'll create this)
+                            toast({
+                              title: 'Rubric Management',
+                              description: 'Rubric criteria management will be available after assignment is created.',
+                            });
+                          }}
+                        >
+                          <ListChecks className="mr-2 h-4 w-4" />
+                          Manage Rubric Criteria
+                        </Button>
+                      )}
+                      {!editingAssignment && (
+                        <p className="text-xs text-muted-foreground italic">
+                          Save the assignment first, then you can add rubric criteria from the assignment details page.
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <Separator />
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogOpen(false)}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        {editingAssignment ? 'Update Assignment' : 'Create Assignment'}
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Assignment instructions..."
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Assessment Type *</Label>
-                  <Select value={assessmentType} onValueChange={setAssessmentType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select assessment type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ASSESSMENT_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Course (Optional)</Label>
-                  <Select value={courseId || 'none'} onValueChange={(v) => setCourseId(v === 'none' ? '' : v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No specific course</SelectItem>
-                      {courses.map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="guidelines">Guidelines & Instructions</Label>
-                  <Textarea
-                    id="guidelines"
-                    value={guidelines}
-                    onChange={(e) => setGuidelines(e.target.value)}
-                    placeholder="Provide detailed guidelines, instructions, and requirements for students..."
-                    rows={4}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Clear instructions help students understand what is expected and how to participate
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dueDate">Due Date</Label>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dueTime">Due Time (Optional)</Label>
-                    <Input
-                      id="dueTime"
-                      type="time"
-                      value={dueTime}
-                      onChange={(e) => setDueTime(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="maxScore">Max Score</Label>
-                  <Input
-                    id="maxScore"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={maxScore}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || (!isNaN(Number(val)) && Number(val) >= 0)) {
-                        setMaxScore(val);
-                      }
-                    }}
-                    placeholder="100"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Maximum points students can earn for this assessment
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={categoryId || 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? '' : v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No category</SelectItem>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isActive"
-                    checked={isActive}
-                    onChange={(e) => setIsActive(e.target.checked)}
-                    className="rounded border-border"
-                  />
-                  <Label htmlFor="isActive" className="cursor-pointer">
-                    Active (visible to students)
-                  </Label>
-                </div>
-                <Button type="submit" className="w-full" disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {editingAssignment ? 'Update Assignment' : 'Create Assignment'}
-                </Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -595,6 +872,18 @@ export default function AssignmentManagement() {
                           <Users className="h-3 w-3" />
                           {assignment.submission_count || 0} submissions
                         </span>
+                        {assignment.late_submission_allowed === false && (
+                          <Badge variant="outline" className="text-xs">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            No late submissions
+                          </Badge>
+                        )}
+                        {assignment.late_submission_allowed && assignment.late_penalty_per_day && assignment.late_penalty_per_day > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {assignment.late_penalty_per_day}% penalty/day
+                          </Badge>
+                        )}
                       </div>
                       {assignment.guidelines && (
                         <div className="mt-2 p-2 bg-muted/50 rounded text-xs">

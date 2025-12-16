@@ -48,10 +48,6 @@ export function ProtectedRoute({
       }
 
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:checkProfileCompletion',message:'Checking profile completion for student',data:{userId:user.id,role,pathname:location.pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-
         // Verify user actually has student role (backend validation)
         const { data: userRoles, error: rolesError } = await supabase
           .from('user_roles')
@@ -64,19 +60,12 @@ export function ProtectedRoute({
           return;
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:checkProfileCompletion',message:'User roles fetched',data:{userId:user.id,roles:userRoles?.map(r=>r.role)||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-
         const roles = (userRoles || []).map(r => r.role);
         const hasStudentRole = roles.includes('student');
         const hasNonStudentRole = roles.some(r => ['guardian', 'teacher', 'admin', 'super_admin'].includes(r));
 
         // If user has guardian/teacher/admin role, they should NOT see profile completion
         if (hasNonStudentRole) {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:checkProfileCompletion',message:'User has non-student role, skipping profile check',data:{userId:user.id,roles,hasNonStudentRole},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
           setCheckingProfile(false);
           return;
         }
@@ -91,10 +80,6 @@ export function ProtectedRoute({
         const { data: dbCheck, error: rpcError } = await supabase.rpc('is_profile_complete', {
           _user_id: user.id,
         });
-
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:checkProfileCompletion',message:'Profile completion check result',data:{userId:user.id,dbCheck,rpcError:rpcError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
 
         if (rpcError) {
           console.error('Error checking profile completion:', rpcError);
@@ -125,9 +110,6 @@ export function ProtectedRoute({
           setProfileComplete(isComplete);
 
           if (!isComplete) {
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:checkProfileCompletion',message:'Profile incomplete, redirecting',data:{userId:user.id,isComplete},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             navigate('/profile-completion', { replace: true });
           }
         } else {
@@ -135,17 +117,11 @@ export function ProtectedRoute({
           setProfileComplete(finalCheck);
 
           if (!finalCheck) {
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:checkProfileCompletion',message:'Profile incomplete (RPC), redirecting',data:{userId:user.id,finalCheck},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             navigate('/profile-completion', { replace: true });
           }
         }
       } catch (error) {
         console.error('Error checking profile completion:', error);
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:checkProfileCompletion',message:'Error in profile check',data:{userId:user.id,error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
       } finally {
         setCheckingProfile(false);
       }
@@ -175,9 +151,6 @@ export function ProtectedRoute({
 
       // Check allowed roles
       if (allowRoles && role && !allowRoles.includes(role)) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:46',message:'role blocked by allowRoles',data:{role,allowRoles,path:location.pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         console.log(`🚫 Role not allowed. Allowed: ${allowRoles.join(', ')}, Current: ${role}`);
         navigate('/dashboard', { replace: true });
         return;
@@ -186,9 +159,6 @@ export function ProtectedRoute({
       // Check permission requirements
       if (requiredPermission) {
         const hasPerm = role === 'super_admin' || hasPermission(requiredPermission.module, requiredPermission.action);
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProtectedRoute.tsx:53',message:'permission check',data:{role,requiredPermission,hasPerm,path:location.pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         if (!hasPerm) {
           console.log(`🚫 Permission denied. Required: ${requiredPermission.module}.${requiredPermission.action}`);
           navigate('/dashboard', { replace: true });

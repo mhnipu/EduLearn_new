@@ -188,15 +188,26 @@ export default function CourseDetail() {
     const firstMaterial = materialsData?.[0];
     setSelectedItem(firstLesson || firstMaterial || null);
 
-    if (user) {
-      const { data: enrollment } = await supabase
-        .from('course_enrollments')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('course_id', courseId)
-        .single();
+    if (user && courseId) {
+      // Use RPC function to check course access (includes enrollment and role-based access)
+      const { data: hasAccess, error: accessError } = await supabase.rpc('has_course_access', {
+        _user_id: user.id,
+        _course_id: courseId,
+      });
 
-      setIsEnrolled(!!enrollment);
+      if (!accessError && hasAccess === true) {
+        setIsEnrolled(true);
+      } else {
+        // Fallback to direct enrollment check
+        const { data: enrollment } = await supabase
+          .from('course_enrollments')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('course_id', courseId)
+          .maybeSingle();
+
+        setIsEnrolled(!!enrollment);
+      }
 
       const { data: progressData } = await supabase
         .from('learning_progress')

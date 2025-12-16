@@ -40,6 +40,7 @@ import AssignmentManagement from "./pages/admin/AssignmentManagement";
 import AssignmentSubmissions from "./pages/admin/AssignmentSubmissions";
 import SiteContent from "./pages/admin/SiteContent";
 import StudentAssignments from "./pages/student/StudentAssignments";
+import QuizExamTaking from "./pages/student/QuizExamTaking";
 import ProfileCompletion from "./pages/ProfileCompletion";
 import NotFound from "./pages/NotFound";
 
@@ -271,6 +272,11 @@ const App = () => (
               <Route path="/student/assignments" element={
                 <ProtectedRoute allowRoles={['student']}>
                   <StudentAssignments />
+                </ProtectedRoute>
+              } />
+              <Route path="/student/quiz/:quizId/take" element={
+                <ProtectedRoute allowRoles={['student']}>
+                  <QuizExamTaking />
                 </ProtectedRoute>
               } />
               

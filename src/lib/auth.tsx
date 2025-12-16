@@ -81,10 +81,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserPermissions = async (userId: string) => {
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:82',message:'fetchUserPermissions entry',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
       const { data, error } = await supabase
         .from('user_module_permissions')
         .select(`
@@ -96,10 +92,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         `)
         .eq('user_id', userId);
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:95',message:'permissions query result',data:{error:error?.message||null,dataCount:data?.length||0,permissions:data?.map((p:any)=>({module:p.modules?.name,create:p.can_create,read:p.can_read,update:p.can_update,delete:p.can_delete}))||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-
       if (error) throw error;
 
       const modulePermissions: ModulePermission[] = (data || []).map((p: any) => ({
@@ -110,16 +102,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         can_delete: p.can_delete,
       }));
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:105',message:'permissions set',data:{permissionsCount:modulePermissions.length,modules:modulePermissions.map(p=>p.module_name)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-
       setPermissions(modulePermissions);
     } catch (error) {
       console.error('Error fetching permissions:', error);
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:108',message:'permissions fetch error',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       setPermissions([]);
     }
   };
@@ -311,31 +296,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     moduleName: string, 
     permission: 'create' | 'read' | 'update' | 'delete' | 'assign' | 'approve'
   ): boolean => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:295',message:'hasPermission check',data:{moduleName,permission,role,permissionsCount:permissions.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    
     // Super admins have all permissions
     if (role === 'super_admin') {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:300',message:'hasPermission result',data:{result:true,reason:'super_admin'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       return true;
     }
     
     // If no role, no permissions
     if (!role) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:303',message:'hasPermission result',data:{result:false,reason:'no_role'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       return false;
     }
     
     const modulePerms = permissions.find(p => p.module_name === moduleName);
     if (!modulePerms) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:307',message:'hasPermission result',data:{result:false,reason:'no_module_perms',availableModules:permissions.map(p=>p.module_name)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       return false;
     }
     
@@ -350,10 +322,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       case 'approve': result = modulePerms.can_update || modulePerms.can_delete; break;
       default: result = false;
     }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.tsx:318',message:'hasPermission result',data:{result,moduleName,permission,modulePerms},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     
     return result;
   };

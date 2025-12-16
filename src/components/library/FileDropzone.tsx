@@ -10,6 +10,7 @@ interface FileDropzoneProps {
   label: string;
   description?: string;
   maxSizeMB?: number;
+  onValidationError?: (error: string) => void;
 }
 
 export function FileDropzone({
@@ -20,28 +21,98 @@ export function FileDropzone({
   label,
   description,
   maxSizeMB = 100,
+  onValidationError,
 }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const validateFile = (file: File): boolean => {
+  const validateFile = (file: File): { valid: boolean; error?: string } => {
     const acceptTypes = accept.split(',').map(t => t.trim());
-    const fileType = file.type;
+    const fileType = file.type.toLowerCase();
     const fileExt = `.${file.name.split('.').pop()?.toLowerCase()}`;
 
-    const isValidType = acceptTypes.some(type => {
-      if (type.startsWith('.')) {
-        return fileExt === type;
+    // Helper function to check if file matches a type pattern
+    const matchesType = (type: string): boolean => {
+      const lowerType = type.toLowerCase();
+      
+      // Handle extensions (e.g., .pdf, .docx)
+      if (lowerType.startsWith('.')) {
+        return fileExt === lowerType;
       }
-      if (type.endsWith('/*')) {
-        return fileType.startsWith(type.replace('/*', '/'));
+      
+      // Handle MIME types with wildcards (e.g., image/*, application/*)
+      if (lowerType.endsWith('/*')) {
+        const baseType = lowerType.replace('/*', '/');
+        return fileType.startsWith(baseType);
       }
-      return fileType === type;
-    });
+      
+      // Handle exact MIME type matches
+      if (fileType === lowerType) {
+        return true;
+      }
+      
+      // Handle common PDF aliases
+      if (lowerType.includes('pdf') || lowerType.includes('application/pdf')) {
+        return fileType === 'application/pdf' || fileExt === '.pdf';
+      }
+      
+      // Handle PowerPoint file types
+      if (lowerType.includes('presentation') || lowerType.includes('powerpoint') || lowerType.includes('ppt')) {
+        return (
+          fileType === 'application/vnd.ms-powerpoint' ||
+          fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+          fileExt === '.ppt' ||
+          fileExt === '.pptx'
+        );
+      }
+      
+      // Handle Word document types
+      if (lowerType.includes('word') || lowerType.includes('wordprocessing') || lowerType.includes('doc')) {
+        return (
+          fileType === 'application/msword' ||
+          fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          fileExt === '.doc' ||
+          fileExt === '.docx'
+        );
+      }
+      
+      // Handle wildcard (*) - accept all files
+      if (lowerType === '*' || lowerType === '*/*') {
+        return true;
+      }
+      
+      return false;
+    };
 
-    if (!isValidType) return false;
-    if (file.size > maxSizeMB * 1024 * 1024) return false;
-    return true;
+    const isValidType = acceptTypes.some(matchesType);
+
+    if (!isValidType) {
+      // Create a more user-friendly error message
+      const acceptedExtensions = acceptTypes
+        .filter(t => t.startsWith('.'))
+        .map(t => t.toUpperCase())
+        .join(', ');
+      const acceptedTypes = acceptTypes
+        .filter(t => !t.startsWith('.') && !t.includes('*'))
+        .join(', ');
+      
+      let errorMsg = 'File type not supported.';
+      if (acceptedExtensions) {
+        errorMsg += ` Accepted file types: ${acceptedExtensions}`;
+      }
+      if (acceptedTypes) {
+        errorMsg += acceptedExtensions ? ` or ${acceptedTypes}` : ` Accepted types: ${acceptedTypes}`;
+      }
+      return { valid: false, error: errorMsg };
+    }
+    
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      return { valid: false, error: `File size (${fileSizeMB} MB) exceeds maximum allowed size (${maxSizeMB} MB)` };
+    }
+    
+    return { valid: true };
   };
 
   const handleDrop = useCallback(
@@ -49,11 +120,16 @@ export function FileDropzone({
       e.preventDefault();
       setIsDragging(false);
       const file = e.dataTransfer.files[0];
-      if (file && validateFile(file)) {
-        onFileSelect(file);
+      if (file) {
+        const validation = validateFile(file);
+        if (validation.valid) {
+          onFileSelect(file);
+        } else if (onValidationError && validation.error) {
+          onValidationError(validation.error);
+        }
       }
     },
-    [onFileSelect, accept, maxSizeMB]
+    [onFileSelect, accept, maxSizeMB, onValidationError]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -68,8 +144,13 @@ export function FileDropzone({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && validateFile(file)) {
-      onFileSelect(file);
+    if (file) {
+      const validation = validateFile(file);
+      if (validation.valid) {
+        onFileSelect(file);
+      } else if (onValidationError && validation.error) {
+        onValidationError(validation.error);
+      }
     }
   };
 

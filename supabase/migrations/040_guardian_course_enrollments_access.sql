@@ -135,3 +135,4 @@ BEGIN
   RAISE NOTICE '📋 Updated policies for: course_enrollments, assignment_submissions, quiz_submissions, learning_progress, certificates';
   RAISE NOTICE '👁️ Guardians can now view all academic data for their linked students';
 END $$;
+

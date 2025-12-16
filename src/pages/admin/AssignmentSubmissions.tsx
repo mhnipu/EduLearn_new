@@ -245,15 +245,18 @@ export default function AssignmentSubmissions() {
                       )}
 
                       {submission.attachment_url && (
-                        <a
-                          href={submission.attachment_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                        >
-                          <Download className="h-4 w-4" />
-                          Download Attachment
-                        </a>
+                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                          <FileText className="h-4 w-4 text-primary" />
+                          <a
+                            href={submission.attachment_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline flex items-center gap-1"
+                          >
+                            <Download className="h-4 w-4" />
+                            Download Student Submission
+                          </a>
+                        </div>
                       )}
 
                       {submission.feedback && (

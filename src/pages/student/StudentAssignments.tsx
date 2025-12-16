@@ -21,6 +21,7 @@ import {
   Upload,
   Send,
   AlertCircle,
+  Download,
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 
@@ -31,6 +32,7 @@ interface Assignment {
   due_date: string | null;
   max_score: number | null;
   is_active: boolean | null;
+  attachment_url?: string | null;
 }
 
 interface Submission {
@@ -122,13 +124,20 @@ export default function StudentAssignments() {
       // Upload attachment if provided
       if (attachmentFile) {
         const fileExt = attachmentFile.name.split('.').pop();
+        if (!fileExt) {
+          throw new Error('File must have an extension');
+        }
+        
         const fileName = `submissions/${user!.id}/${submittingTo.id}/${Date.now()}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from('library-files')
           .upload(fileName, attachmentFile, { upsert: true });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error(`Failed to upload file: ${uploadError.message}`);
+        }
 
         const { data: urlData } = supabase.storage
           .from('library-files')
@@ -153,6 +162,9 @@ export default function StudentAssignments() {
         if (error) throw error;
         toast({ title: 'Submission updated successfully' });
       } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentAssignments.tsx:166',message:'Creating new assignment submission',data:{assignmentId:submittingTo.id,studentId:user!.id,hasText:!!submissionText.trim(),hasAttachment:!!attachmentUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         // Create new submission
         const { error } = await supabase.from('assignment_submissions').insert({
           assignment_id: submittingTo.id,
@@ -160,6 +172,10 @@ export default function StudentAssignments() {
           submission_text: submissionText.trim() || null,
           attachment_url: attachmentUrl,
         });
+
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentAssignments.tsx:173',message:'Submission insert result',data:{error:error?.message||null,code:error?.code||null,statusCode:error?.statusCode||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
 
         if (error) throw error;
         toast({ title: 'Assignment submitted successfully' });
@@ -239,6 +255,21 @@ export default function StudentAssignments() {
                 Max: {assignment.max_score} pts
               </span>
             </div>
+
+            {assignment.attachment_url && (
+              <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                <FileText className="h-4 w-4 text-primary" />
+                <a
+                  href={assignment.attachment_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                >
+                  <Download className="h-3 w-3" />
+                  Download Assignment File
+                </a>
+              </div>
+            )}
 
             {isGraded && submission.feedback && (
               <div className="border-l-2 border-primary pl-3 bg-muted/30 py-2 rounded-r">
@@ -345,13 +376,16 @@ export default function StudentAssignments() {
               <div className="space-y-2">
                 <Label>Attachment (optional)</Label>
                 <FileDropzone
-                  accept="*"
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                   maxSizeMB={20}
                   selectedFile={attachmentFile}
                   onFileSelect={setAttachmentFile}
                   onClear={() => setAttachmentFile(null)}
                   label="Upload file"
-                  description="Max 20MB"
+                  description="PDF, Word, PowerPoint (Max 20MB)"
+                  onValidationError={(error) => {
+                    toast({ title: error, variant: 'destructive' });
+                  }}
                 />
               </div>
               <div className="flex justify-end gap-2">

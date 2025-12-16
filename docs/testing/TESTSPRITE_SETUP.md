@@ -63,6 +63,24 @@ The `testsprite.config.json` file contains:
 - Test scenarios for each route
 - Component coverage targets
 
+## Comprehensive PRD for TestSprite
+
+A detailed Product Requirements Document (PRD) is available at `docs/testing/TESTSPRITE_PRD.md`:
+- Complete route mapping (40+ routes)
+- Detailed component inventory
+- User roles and permissions
+- Test scenarios with expected behaviors
+- Integration points
+- Edge cases and error handling
+- Performance and accessibility requirements
+
+**Usage**: Reference this PRD when running TestSprite for comprehensive testing:
+```
+Run comprehensive tests using TESTSPRITE_PRD.md on http://localhost:8080
+```
+
+See `docs/testing/TESTSPRITE_PRD_GUIDE.md` for detailed usage instructions.
+
 ## Expected Test Areas
 
 1. **UI Components**: All shadcn-ui components

@@ -635,6 +635,8 @@ const AdminDashboard = () => {
                 onClick={() => navigate('/admin/users')} 
                 className="h-auto py-5 justify-start group hover:shadow-lg transition-all"
                 variant="outline"
+                data-testid="manage-users-button"
+                aria-label="Manage Users"
               >
                 <div className="mr-3 h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
                   <UserPlus className="h-5 w-5 text-blue-500" />
@@ -649,6 +651,8 @@ const AdminDashboard = () => {
                 onClick={() => navigate('/admin/course-wizard')} 
                 className="h-auto py-5 justify-start group hover:shadow-lg transition-all"
                 variant="outline"
+                data-testid="course-wizard-button"
+                aria-label="Course Wizard"
               >
                 <div className="mr-3 h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
                   <Wand2 className="h-5 w-5 text-green-500" />

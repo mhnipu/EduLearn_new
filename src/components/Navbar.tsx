@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { GraduationCap, Moon, Sun, LogOut, User, BookOpen, LayoutDashboard, Library, Shield, Users, Mail, ChevronRight, Settings, FileText, Award, Bell, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/contexts/ThemeContext';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 export const Navbar = () => {
   const { user, signOut, role, roles } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
   const [profileData, setProfileData] = useState<{ full_name: string | null; avatar_url: string | null } | null>(null);
 
   const getDashboardPath = () => {
@@ -73,88 +75,180 @@ export const Navbar = () => {
     return colors[role || ''] || 'bg-gray-100 text-gray-700 border-gray-300';
   };
 
+  const isActiveRoute = (path: string) => {
+    if (path === '/dashboard') {
+      return location.pathname.startsWith('/dashboard');
+    }
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+
   return (
-    <nav className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-2xl font-bold text-primary">
-            <GraduationCap className="h-8 w-8" />
-            <span>EduLearn</span>
+    <nav className="border-b border-border/50 bg-background/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo Section - Enhanced */}
+          <Link 
+            to="/" 
+            className="flex items-center gap-2.5 group transition-all duration-200 hover:opacity-80"
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-lg blur-md group-hover:blur-lg transition-all duration-200" />
+              <div className="relative bg-gradient-to-br from-primary to-primary/70 p-2 rounded-lg shadow-lg">
+                <GraduationCap className="h-6 w-6 text-primary-foreground" />
+              </div>
+            </div>
+            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              EduLearn
+            </span>
           </Link>
 
-          <div className="flex items-center gap-4">
+          {/* Navigation Links - Enhanced */}
+          <div className="flex items-center gap-1 sm:gap-2">
             {user && (
               <>
                 <Link to="/courses">
-                  <Button variant="ghost" size="sm">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Courses
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className={cn(
+                      "relative h-9 px-3 sm:px-4 transition-all duration-200 font-medium rounded-lg",
+                      isActiveRoute('/courses')
+                        ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary border border-primary/30 shadow-sm hover:shadow-md hover:from-primary/25 hover:to-primary/15"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    )}
+                  >
+                    <BookOpen className={cn(
+                      "h-4 w-4 mr-2 transition-all duration-200",
+                      isActiveRoute('/courses') && "scale-110"
+                    )} />
+                    <span className="hidden sm:inline font-semibold">Courses</span>
+                    {isActiveRoute('/courses') && (
+                      <>
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-t-full" />
+                      </>
+                    )}
                   </Button>
                 </Link>
                 <Link to="/library">
-                  <Button variant="ghost" size="sm">
-                    <Library className="h-4 w-4 mr-2" />
-                    Library
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className={cn(
+                      "relative h-9 px-3 sm:px-4 transition-all duration-200 font-medium rounded-lg",
+                      isActiveRoute('/library')
+                        ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary border border-primary/30 shadow-sm hover:shadow-md hover:from-primary/25 hover:to-primary/15"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    )}
+                  >
+                    <Library className={cn(
+                      "h-4 w-4 mr-2 transition-all duration-200",
+                      isActiveRoute('/library') && "scale-110"
+                    )} />
+                    <span className="hidden sm:inline font-semibold">Library</span>
+                    {isActiveRoute('/library') && (
+                      <>
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-t-full" />
+                      </>
+                    )}
                   </Button>
                 </Link>
                 <Link to={getDashboardPath()}>
-                  <Button variant="ghost" size="sm">
-                    <LayoutDashboard className="h-4 w-4 mr-2" />
-                    Dashboard
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className={cn(
+                      "relative h-9 px-3 sm:px-4 transition-all duration-200 font-medium rounded-lg",
+                      isActiveRoute('/dashboard')
+                        ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary border border-primary/30 shadow-sm hover:shadow-md hover:from-primary/25 hover:to-primary/15"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                    )}
+                  >
+                    <LayoutDashboard className={cn(
+                      "h-4 w-4 mr-2 transition-all duration-200",
+                      isActiveRoute('/dashboard') && "scale-110"
+                    )} />
+                    <span className="hidden sm:inline font-semibold">Dashboard</span>
+                    {isActiveRoute('/dashboard') && (
+                      <>
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-t-full" />
+                      </>
+                    )}
                   </Button>
                 </Link>
               </>
             )}
 
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+            {/* Theme Toggle - Enhanced */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleTheme}
+              className="h-9 w-9 rounded-lg hover:bg-accent/50 transition-all duration-200"
+            >
+              {theme === 'light' ? (
+                <Moon className="h-4 w-4 transition-transform duration-200 hover:rotate-12" />
+              ) : (
+                <Sun className="h-4 w-4 transition-transform duration-200 hover:rotate-12" />
+              )}
             </Button>
 
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Avatar className="h-6 w-6">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2 h-9 px-2 sm:px-3 border-border/50 hover:border-primary/50 hover:bg-accent/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    <Avatar className="h-6 w-6 border-2 border-primary/20">
                       <AvatarImage src={profileData?.avatar_url || undefined} alt={profileData?.full_name || 'User'} />
-                      <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
+                      <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
                         {getInitials(profileData?.full_name)}
                       </AvatarFallback>
                     </Avatar>
                     {role && (
-                      <span className="hidden sm:inline capitalize">{role.replace('_', ' ')}</span>
+                      <span className="hidden sm:inline capitalize text-sm font-medium">
+                        {role.replace('_', ' ')}
+                      </span>
                     )}
-                    <ChevronRight className="h-3 w-3 opacity-50" />
+                    <ChevronRight className="h-3 w-3 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-90" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
                   align="end" 
-                  className="w-64 p-0 border border-primary/20 shadow-xl backdrop-blur-md bg-background/80"
+                  className="w-64 p-0 border border-primary/20 shadow-2xl backdrop-blur-md bg-background/95 mt-2"
                 >
-                  {/* User Info Header - Compact */}
-                  <div className="px-3 py-2.5 border-b border-primary/10">
-                    <div className="flex items-center gap-2.5 mb-2">
-                      <Avatar className="h-9 w-9 border border-primary/20">
-                        <AvatarImage src={profileData?.avatar_url || undefined} alt={profileData?.full_name || 'User'} />
-                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-xs font-semibold">
-                          {getInitials(profileData?.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
+                  {/* User Info Header - Enhanced */}
+                  <div className="px-4 py-3 border-b border-primary/10 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-primary/20 rounded-full blur-md" />
+                        <Avatar className="relative h-10 w-10 border-2 border-primary/30 shadow-md">
+                          <AvatarImage src={profileData?.avatar_url || undefined} alt={profileData?.full_name || 'User'} />
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-sm font-bold">
+                            {getInitials(profileData?.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">
+                        <p className="text-sm font-bold text-foreground truncate">
                           {profileData?.full_name || 'User'}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
                           {user.email}
                         </p>
                       </div>
                     </div>
                     {roles.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5">
                         {roles.map(r => (
                           <Badge 
                             key={r} 
                             variant="secondary" 
-                            className={`text-xs px-1.5 py-0 ${getRoleColor(r)} border`}
+                            className={`text-xs px-2 py-0.5 ${getRoleColor(r)} border font-medium shadow-sm`}
                           >
                             {r?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                           </Badge>
@@ -164,52 +258,82 @@ export const Navbar = () => {
                   </div>
 
                   {/* Quick Links */}
-                  <div className="py-1.5">
+                  <div className="py-2">
                     <DropdownMenuGroup>
-                      <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                        <Link to="/courses" className="cursor-pointer flex items-center w-full py-1.5">
-                          <BookOpen className="h-4 w-4 mr-2.5 text-primary" />
-                          <span className="flex-1 text-sm">Courses</span>
+                      <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                        <Link to="/courses" className="flex items-center w-full py-2">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 mr-3">
+                            <BookOpen className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="flex-1 text-sm font-medium">Courses</span>
+                          {isActiveRoute('/courses') && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                          )}
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                        <Link to="/library" className="cursor-pointer flex items-center w-full py-1.5">
-                          <Library className="h-4 w-4 mr-2.5 text-primary" />
-                          <span className="flex-1 text-sm">Library</span>
+                      <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                        <Link to="/library" className="flex items-center w-full py-2">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 mr-3">
+                            <Library className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="flex-1 text-sm font-medium">Library</span>
+                          {isActiveRoute('/library') && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                          )}
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                        <Link to={getDashboardPath()} className="cursor-pointer flex items-center w-full py-1.5">
-                          <LayoutDashboard className="h-4 w-4 mr-2.5 text-primary" />
-                          <span className="flex-1 text-sm">Dashboard</span>
+                      <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                        <Link to={getDashboardPath()} className="flex items-center w-full py-2">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 mr-3">
+                            <LayoutDashboard className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="flex-1 text-sm font-medium">Dashboard</span>
+                          {isActiveRoute('/dashboard') && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                          )}
                         </Link>
                       </DropdownMenuItem>
                     </DropdownMenuGroup>
                   </div>
 
                   {/* Account Section */}
-                  <DropdownMenuSeparator className="bg-primary/10 my-1" />
-                  <div className="py-1.5">
+                  <DropdownMenuSeparator className="bg-primary/10 my-1.5" />
+                  <div className="py-2">
                     <DropdownMenuGroup>
-                      <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                        <Link to="/profile" className="cursor-pointer flex items-center w-full py-1.5">
-                          <User className="h-4 w-4 mr-2.5 text-primary" />
-                          <span className="flex-1 text-sm">Profile</span>
+                      <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                        <Link to="/profile" className="flex items-center w-full py-2">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 mr-3">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="flex-1 text-sm font-medium">Profile</span>
+                          {isActiveRoute('/profile') && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                          )}
                         </Link>
                       </DropdownMenuItem>
                       {role === 'student' && (
-                        <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                          <Link to="/student/assignments" className="cursor-pointer flex items-center w-full py-1.5">
-                            <FileText className="h-4 w-4 mr-2.5 text-primary" />
-                            <span className="flex-1 text-sm">Assignments</span>
+                        <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                          <Link to="/student/assignments" className="flex items-center w-full py-2">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 mr-3">
+                              <FileText className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="flex-1 text-sm font-medium">Assignments</span>
+                            {isActiveRoute('/student/assignments') && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                            )}
                           </Link>
                         </DropdownMenuItem>
                       )}
                       {(role === 'teacher' || role === 'admin' || role === 'super_admin') && (
-                        <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                          <Link to="/admin/assignments" className="cursor-pointer flex items-center w-full py-1.5">
-                            <FileText className="h-4 w-4 mr-2.5 text-primary" />
-                            <span className="flex-1 text-sm">Assignments</span>
+                        <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                          <Link to="/admin/assignments" className="flex items-center w-full py-2">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 mr-3">
+                              <FileText className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="flex-1 text-sm font-medium">Assignments</span>
+                            {isActiveRoute('/admin/assignments') && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                            )}
                           </Link>
                         </DropdownMenuItem>
                       )}
@@ -219,27 +343,42 @@ export const Navbar = () => {
                   {/* Admin Section */}
                   {(role === 'super_admin' || role === 'admin') && (
                     <>
-                      <DropdownMenuSeparator className="bg-primary/10 my-1" />
-                      <div className="py-1.5">
+                      <DropdownMenuSeparator className="bg-primary/10 my-1.5" />
+                      <div className="py-2">
                         <DropdownMenuGroup>
                           {role === 'super_admin' && (
-                            <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                              <Link to="/admin/super" className="cursor-pointer flex items-center w-full py-1.5">
-                                <Shield className="h-4 w-4 mr-2.5 text-purple-600" />
-                                <span className="flex-1 text-sm">Super Admin</span>
+                            <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                              <Link to="/admin/super" className="flex items-center w-full py-2">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-100 dark:bg-purple-900/30 mr-3">
+                                  <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <span className="flex-1 text-sm font-medium">Super Admin</span>
+                                {isActiveRoute('/admin/super') && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                )}
                               </Link>
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                            <Link to="/admin/users" className="cursor-pointer flex items-center w-full py-1.5">
-                              <Users className="h-4 w-4 mr-2.5 text-blue-600" />
-                              <span className="flex-1 text-sm">User Management</span>
+                          <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                            <Link to="/admin/users" className="flex items-center w-full py-2">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 dark:bg-blue-900/30 mr-3">
+                                <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <span className="flex-1 text-sm font-medium">User Management</span>
+                              {isActiveRoute('/admin/users') && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                              )}
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                            <Link to="/admin/system-monitoring" className="cursor-pointer flex items-center w-full py-1.5">
-                              <Settings className="h-4 w-4 mr-2.5 text-green-600" />
-                              <span className="flex-1 text-sm">System Monitoring</span>
+                          <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                            <Link to="/admin/system-monitoring" className="flex items-center w-full py-2">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-100 dark:bg-green-900/30 mr-3">
+                                <Settings className="h-4 w-4 text-green-600 dark:text-green-400" />
+                              </div>
+                              <span className="flex-1 text-sm font-medium">System Monitoring</span>
+                              {isActiveRoute('/admin/system-monitoring') && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                              )}
                             </Link>
                           </DropdownMenuItem>
                         </DropdownMenuGroup>
@@ -250,13 +389,18 @@ export const Navbar = () => {
                   {/* Teacher Section */}
                   {role === 'teacher' && (
                     <>
-                      <DropdownMenuSeparator className="bg-primary/10 my-1" />
-                      <div className="py-1.5">
+                      <DropdownMenuSeparator className="bg-primary/10 my-1.5" />
+                      <div className="py-2">
                         <DropdownMenuGroup>
-                          <DropdownMenuItem asChild className="mx-1.5 my-0.5 rounded-md hover:bg-primary/10 transition-colors">
-                            <Link to="/teacher/students" className="cursor-pointer flex items-center w-full py-1.5">
-                              <Users className="h-4 w-4 mr-2.5 text-green-600" />
-                              <span className="flex-1 text-sm">My Students</span>
+                          <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                            <Link to="/teacher/students" className="flex items-center w-full py-2">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-100 dark:bg-green-900/30 mr-3">
+                                <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
+                              </div>
+                              <span className="flex-1 text-sm font-medium">My Students</span>
+                              {isActiveRoute('/teacher/students') && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                              )}
                             </Link>
                           </DropdownMenuItem>
                         </DropdownMenuGroup>
@@ -265,18 +409,20 @@ export const Navbar = () => {
                   )}
 
                   {/* Actions Section */}
-                  <DropdownMenuSeparator className="bg-primary/10 my-1" />
-                  <div className="py-1.5">
+                  <DropdownMenuSeparator className="bg-primary/10 my-1.5" />
+                  <div className="py-2 pb-3">
                     <DropdownMenuGroup>
                       <DropdownMenuItem 
                         onClick={async () => {
                           await signOut();
                           window.location.href = '/auth';
                         }} 
-                        className="mx-1.5 my-0.5 rounded-md hover:bg-destructive/10 transition-colors cursor-pointer text-destructive focus:text-destructive py-1.5"
+                        className="mx-2 my-1 rounded-lg hover:bg-destructive/10 transition-all duration-200 cursor-pointer text-destructive focus:text-destructive py-2"
                       >
-                        <LogOut className="h-4 w-4 mr-2.5" />
-                        <span className="flex-1 text-sm">Sign Out</span>
+                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-destructive/10 mr-3">
+                          <LogOut className="h-4 w-4 text-destructive" />
+                        </div>
+                        <span className="flex-1 text-sm font-medium">Sign Out</span>
                       </DropdownMenuItem>
                     </DropdownMenuGroup>
                   </div>
@@ -284,7 +430,12 @@ export const Navbar = () => {
               </DropdownMenu>
             ) : (
               <Link to="/auth">
-                <Button size="sm">Get Started</Button>
+                <Button 
+                  size="sm" 
+                  className="h-9 px-4 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  Get Started
+                </Button>
               </Link>
             )}
           </div>

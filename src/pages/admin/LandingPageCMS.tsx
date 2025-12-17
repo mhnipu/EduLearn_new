@@ -11,7 +11,7 @@ import { SectionEditor } from '@/components/cms/SectionEditor';
 import { SectionLibrary } from '@/components/cms/SectionLibrary';
 import { getDefaultContent, getSectionSchema } from '@/lib/cms/sectionSchemas';
 import { BackButton } from '@/components/BackButton';
-import {
+import { 
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -92,8 +92,8 @@ export default function LandingPageCMS() {
     if (!user) return;
 
     try {
-      const maxOrder = sections.length > 0
-        ? Math.max(...sections.map(s => s.order_index))
+      const maxOrder = sections.length > 0 
+        ? Math.max(...sections.map(s => s.order_index)) 
         : -1;
 
       const schema = getSectionSchema(sectionType);
@@ -143,12 +143,12 @@ export default function LandingPageCMS() {
       }));
 
       for (const update of updates) {
-        const { error } = await supabase
+      const { error } = await supabase
           .from('page_sections' as any)
           .update({ order_index: update.order_index })
           .eq('id', update.id);
 
-        if (error) throw error;
+      if (error) throw error;
       }
 
       setSections(newOrder);
@@ -236,12 +236,12 @@ export default function LandingPageCMS() {
 
   const handleToggleLock = async (section: PageSection) => {
     try {
-      const { error } = await supabase
+        const { error } = await supabase
         .from('page_sections' as any)
         .update({ is_locked: !section.is_locked } as any)
         .eq('id', section.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
       await fetchSections();
       toast({
@@ -331,9 +331,9 @@ export default function LandingPageCMS() {
               View Landing Page
             </Button>
             <Button onClick={() => setIsLibraryOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Section
-            </Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Section
+                </Button>
           </div>
         </div>
 

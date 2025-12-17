@@ -521,3 +521,4 @@ The EDulearn platform has been thoroughly analyzed through static code review. *
 **High Priority Issues**: 3 (N+1 queries, Race condition, File validation)  
 **Medium Priority Issues**: 5 (Loading states, Error messages, etc.)
 
+

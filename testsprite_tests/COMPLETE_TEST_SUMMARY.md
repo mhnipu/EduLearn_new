@@ -257,3 +257,4 @@ The EDulearn platform has been thoroughly tested with **30 automated test cases*
 **Critical Issues**: 3  
 **High Priority Issues**: 3
 
+

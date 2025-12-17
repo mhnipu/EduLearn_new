@@ -482,7 +482,10 @@ const StudentDashboard = () => {
 
         {/* Tabbed Content */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+          <TabsList 
+            className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex"
+            style={{ backgroundColor: 'rgba(247, 234, 224, 1)' }}
+          >
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="assessments">Assessments</TabsTrigger>

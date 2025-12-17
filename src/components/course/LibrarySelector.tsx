@@ -158,7 +158,10 @@ export function LibrarySelector({
           </DialogHeader>
           
           <Tabs defaultValue="books" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList 
+              className="grid w-full grid-cols-2"
+              style={{ backgroundColor: 'rgba(248, 234, 226, 1)' }}
+            >
               <TabsTrigger value="books" className="flex items-center gap-2">
                 <Book className="h-4 w-4" />
                 Books ({selectedBooks.length} selected)

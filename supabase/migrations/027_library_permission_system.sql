@@ -715,3 +715,11 @@ BEGIN
   RAISE NOTICE '⚠️  Course-based access has been removed for students and teachers.';
 END $$;
 
+
+
+
+
+
+
+
+

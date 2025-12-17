@@ -659,7 +659,17 @@ const TeacherDashboard = () => {
 
         {/* Tabs for Organized Sections */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList
+            className="grid w-full grid-cols-5 max-w-2xl"
+            style={{
+              backgroundClip: 'unset',
+              WebkitBackgroundClip: 'unset',
+              color: 'rgba(0, 0, 0, 1)',
+              background: 'unset',
+              backgroundColor: 'rgba(248, 234, 226, 1)',
+              backgroundImage: 'none',
+            }}
+          >
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="students">Students</TabsTrigger>
             <TabsTrigger value="assessments">Assessments</TabsTrigger>

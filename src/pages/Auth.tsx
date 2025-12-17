@@ -360,7 +360,10 @@ export default function AuthEnhanced() {
               setForgotPasswordEmail('');
             }}
           >
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList 
+              className="grid w-full grid-cols-2"
+              style={{ backgroundColor: 'rgba(248, 234, 226, 1)' }}
+            >
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>

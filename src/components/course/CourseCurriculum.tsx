@@ -195,7 +195,7 @@ export function CourseCurriculum({
                 if (pdfUrl) {
                   return (
                     <div className="space-y-4">
-                      <div className="aspect-video bg-muted rounded-lg overflow-hidden shadow-lg border">
+                      <div className="aspect-video bg-course-detail rounded-lg overflow-hidden shadow-lg border">
                         <iframe
                           src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
                           className="w-full h-full"
@@ -212,7 +212,7 @@ export function CourseCurriculum({
                   );
                 }
                 return (
-                  <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border-2 border-dashed">
+                  <div className="aspect-video bg-course-detail rounded-lg flex items-center justify-center border-2 border-dashed">
                     <div className="text-center">
                       <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
                       <p className="text-muted-foreground">No content available</p>
@@ -227,7 +227,7 @@ export function CourseCurriculum({
             <CardContent className="flex flex-col items-center justify-center py-20">
               {!isEnrolled ? (
                 <>
-                  <div className="p-4 bg-muted rounded-full mb-4">
+                  <div className="p-4 bg-course-detail rounded-full mb-4">
                     <Lock className="h-12 w-12 text-muted-foreground" />
                   </div>
                   <h3 className="text-xl font-semibold mb-2">Enroll to Access Content</h3>
@@ -264,7 +264,7 @@ export function CourseCurriculum({
                 <span className="text-muted-foreground">Progress</span>
                 <span className="font-semibold">{progressPercentage}%</span>
               </div>
-              <div className="w-full bg-muted rounded-full h-2">
+              <div className="w-full bg-course-detail rounded-full h-2">
                 <div 
                   className="bg-primary h-2 rounded-full transition-all duration-300"
                   style={{ width: `${progressPercentage}%` }}
@@ -289,7 +289,7 @@ export function CourseCurriculum({
                   return (
                     <Accordion key={module.id} type="single" collapsible className="w-full">
                       <AccordionItem value={module.id} className="border-0">
-                        <AccordionTrigger className="px-3 py-2.5 hover:no-underline bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <AccordionTrigger className="px-3 py-2.5 hover:no-underline bg-course-detail/50 rounded-lg hover:bg-course-detail transition-colors">
                           <div className="flex items-center justify-between w-full pr-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <Layers className="h-4 w-4 text-primary flex-shrink-0" />

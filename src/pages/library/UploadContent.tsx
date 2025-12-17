@@ -262,7 +262,6 @@ export default function UploadContent() {
       <Tabs defaultValue="book" className="w-full">
         <TabsList 
           className="grid w-full grid-cols-2"
-          style={{ backgroundColor: 'rgba(248, 234, 226, 1)' }}
         >
           <TabsTrigger value="book">
             <BookOpen className="mr-2 h-4 w-4" />

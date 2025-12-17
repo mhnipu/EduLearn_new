@@ -216,42 +216,42 @@ const TeacherDashboard = () => {
         studentsCount = students || 0;
       }
 
-      setStats({
-        myCourses: allCourses.length || 0,
-        totalLessons: lessonsCount,
-        totalStudents: studentsCount,
-      });
-
-      // Fetch detailed stats for each course (for charts)
-      if (allCourses && allCourses.length > 0) {
-        const courseStatsPromises = allCourses.slice(0, 5).map(async (course) => {
-          const [lessonsRes, studentsRes] = await Promise.all([
-            supabase
-              .from('lessons')
-              .select('id', { count: 'exact', head: true })
-              .eq('course_id', course.id),
-            supabase
-              .from('course_enrollments')
-              .select('id', { count: 'exact', head: true })
-              .eq('course_id', course.id)
-          ]);
-
-          return {
-            name: course.title.substring(0, 15) + (course.title.length > 15 ? '...' : ''),
-            students: studentsRes.count || 0,
-            lessons: lessonsRes.count || 0
-          };
+        setStats({
+          myCourses: allCourses.length || 0,
+          totalLessons: lessonsCount,
+          totalStudents: studentsCount,
         });
 
-        const statsData = await Promise.all(courseStatsPromises);
-        setCourseStats(statsData);
+        // Fetch detailed stats for each course (for charts)
+        if (allCourses && allCourses.length > 0) {
+          const courseStatsPromises = allCourses.slice(0, 5).map(async (course) => {
+            const [lessonsRes, studentsRes] = await Promise.all([
+              supabase
+                .from('lessons')
+                .select('id', { count: 'exact', head: true })
+                .eq('course_id', course.id),
+              supabase
+                .from('course_enrollments')
+                .select('id', { count: 'exact', head: true })
+                .eq('course_id', course.id)
+            ]);
+
+            return {
+              name: course.title.substring(0, 15) + (course.title.length > 15 ? '...' : ''),
+              students: studentsRes.count || 0,
+              lessons: lessonsRes.count || 0
+            };
+          });
+
+          const statsData = await Promise.all(courseStatsPromises);
+          setCourseStats(statsData);
+        }
+      } catch (error) {
+        console.error('Error fetching teacher data:', error);
+      } finally {
+        setLoadingData(false);
       }
-    } catch (error) {
-      console.error('Error fetching teacher data:', error);
-    } finally {
-      setLoadingData(false);
-    }
-  };
+    };
 
   const fetchEnrolledStudents = async () => {
     try {
@@ -540,7 +540,7 @@ const TeacherDashboard = () => {
       project: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
       presentation: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
     };
-    return colors[type] || 'bg-gray-500/10 text-gray-600 dark:text-gray-400';
+    return colors[type] || 'bg-course-detail/10 text-primary';
   };
 
   if (loading || loadingData) {
@@ -661,14 +661,6 @@ const TeacherDashboard = () => {
         <Tabs defaultValue="overview" className="w-full">
           <TabsList
             className="grid w-full grid-cols-5 max-w-2xl"
-            style={{
-              backgroundClip: 'unset',
-              WebkitBackgroundClip: 'unset',
-              color: 'rgba(0, 0, 0, 1)',
-              background: 'unset',
-              backgroundColor: 'rgba(248, 234, 226, 1)',
-              backgroundImage: 'none',
-            }}
           >
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="students">Students</TabsTrigger>
@@ -768,8 +760,8 @@ const TeacherDashboard = () => {
               </CardHeader>
               <CardContent>
                 {courses.length === 0 ? (
-                  <div className="text-center py-16 bg-muted/20 rounded-xl">
-                    <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+                  <div className="text-center py-16 bg-course-detail/20 rounded-xl">
+                    <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-course-detail/40 flex items-center justify-center">
                       <BookOpen className="h-10 w-10 text-muted-foreground/50" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">No Courses Yet</h3>
@@ -886,7 +878,7 @@ const TeacherDashboard = () => {
               </CardHeader>
               <CardContent>
                 {filteredStudents.length === 0 ? (
-                  <div className="text-center py-16 bg-muted/20 rounded-xl">
+                  <div className="text-center py-16 bg-course-detail/20 rounded-xl">
                     <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">No Students Found</h3>
                     <p className="text-muted-foreground">
@@ -1145,7 +1137,7 @@ const TeacherDashboard = () => {
                         }
                       }}>
                         <CardContent className="p-0">
-                          <div className="aspect-[3/4] bg-muted relative overflow-hidden">
+                          <div className="aspect-[3/4] bg-course-detail relative overflow-hidden">
                             {item.thumbnail_url ? (
                               <img
                                 src={item.thumbnail_url}

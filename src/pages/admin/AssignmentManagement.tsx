@@ -26,6 +26,11 @@ import {
   AlertCircle,
   ListChecks,
   Download,
+  Search,
+  Filter,
+  TrendingUp,
+  Award,
+  Eye,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -98,6 +103,10 @@ export default function AssignmentManagement() {
   const [latePenaltyPerDay, setLatePenaltyPerDay] = useState<string>('0');
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterCourse, setFilterCourse] = useState<string>('all');
 
   const canManage = role === 'admin' || role === 'super_admin' || role === 'teacher';
 
@@ -249,6 +258,22 @@ export default function AssignmentManagement() {
       setLoading(false);
     }
   };
+
+  // Filter assignments based on search and filters
+  const filteredAssignments = assignments.filter(assignment => {
+    const matchesSearch = !searchQuery || 
+      assignment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignment.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignment.course_title?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesType = filterType === 'all' || assignment.assessment_type === filterType;
+    const matchesStatus = filterStatus === 'all' || 
+      (filterStatus === 'active' && assignment.is_active) ||
+      (filterStatus === 'inactive' && !assignment.is_active);
+    const matchesCourse = filterCourse === 'all' || assignment.course_id === filterCourse;
+
+    return matchesSearch && matchesType && matchesStatus && matchesCourse;
+  });
 
   const resetForm = () => {
     setTitle('');
@@ -490,13 +515,16 @@ export default function AssignmentManagement() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Assignment Management</h1>
-              <p className="text-muted-foreground">Create and manage assignments for students</p>
+              <h1 className="text-3xl font-bold flex items-center gap-2 text-foreground">
+                <FileText className="h-8 w-8 text-primary" />
+                Assignment Management
+              </h1>
+              <p className="text-muted-foreground mt-1">Create and manage assignments for students</p>
             </div>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={openCreateDialog}>
+              <Button onClick={openCreateDialog} className="bg-primary hover:bg-primary/90 font-semibold">
                 <Plus className="mr-2 h-4 w-4" />
                 New Assignment
               </Button>
@@ -507,10 +535,25 @@ export default function AssignmentManagement() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <Tabs defaultValue="basic" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                    <TabsTrigger value="settings">Settings</TabsTrigger>
-                    <TabsTrigger value="grading">Grading</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3 bg-course-detail-20 p-1">
+                    <TabsTrigger 
+                      value="basic"
+                      className="data-[state=active]:bg-course-detail-full data-[state=active]:text-foreground font-semibold transition-all"
+                    >
+                      Basic Info
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="settings"
+                      className="data-[state=active]:bg-course-detail-full data-[state=active]:text-foreground font-semibold transition-all"
+                    >
+                      Settings
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="grading"
+                      className="data-[state=active]:bg-course-detail-full data-[state=active]:text-foreground font-semibold transition-all"
+                    >
+                      Grading
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="basic" className="space-y-4 mt-4">
@@ -620,7 +663,7 @@ export default function AssignmentManagement() {
                         Upload supporting files (PDF, PPT, DOC, etc.) for students to download
                       </p>
                       {attachmentUrl && !attachmentFile && (
-                        <div className="mb-3 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+                        <div className="mb-3 p-3 bg-course-detail-50 rounded-lg border border-course-detail/30 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Current attachment</span>
@@ -628,7 +671,7 @@ export default function AssignmentManagement() {
                               href={attachmentUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-sm text-primary hover:underline flex items-center gap-1"
+                              className="text-sm text-primary hover:underline flex items-center gap-1 font-semibold"
                             >
                               <Download className="h-3 w-3" />
                               Download
@@ -639,6 +682,7 @@ export default function AssignmentManagement() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setAttachmentUrl(null)}
+                            className="hover:bg-destructive/10 hover:text-destructive"
                           >
                             Remove
                           </Button>
@@ -661,9 +705,9 @@ export default function AssignmentManagement() {
 
                   <TabsContent value="settings" className="space-y-4 mt-4">
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center justify-between p-4 border border-course-detail/30 rounded-lg bg-course-detail-20">
                         <div className="space-y-0.5">
-                          <Label htmlFor="isActive" className="text-base font-medium cursor-pointer">
+                          <Label htmlFor="isActive" className="text-base font-semibold cursor-pointer">
                             Active Status
                           </Label>
                           <p className="text-sm text-muted-foreground">
@@ -679,10 +723,10 @@ export default function AssignmentManagement() {
 
                       <Separator />
 
-                      <div className="space-y-4 p-4 border rounded-lg">
+                      <div className="space-y-4 p-4 border border-course-detail/30 rounded-lg bg-course-detail-20">
                         <div className="flex items-center gap-2 mb-2">
-                          <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                          <Label className="text-base font-medium">Late Submission Policy</Label>
+                          <AlertCircle className="h-4 w-4 text-primary" />
+                          <Label className="text-base font-semibold">Late Submission Policy</Label>
                         </div>
                         
                         <div className="flex items-center justify-between">
@@ -754,10 +798,10 @@ export default function AssignmentManagement() {
 
                     <Separator />
 
-                    <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="space-y-4 p-4 border border-course-detail/30 rounded-lg bg-course-detail-20">
                       <div className="flex items-center gap-2 mb-2">
-                        <ListChecks className="h-4 w-4 text-muted-foreground" />
-                        <Label className="text-base font-medium">Rubric Criteria</Label>
+                        <ListChecks className="h-4 w-4 text-primary" />
+                        <Label className="text-base font-semibold">Rubric Criteria</Label>
                       </div>
                       <p className="text-sm text-muted-foreground mb-4">
                         Create rubric criteria for detailed grading. You can add criteria after creating the assignment.
@@ -774,6 +818,7 @@ export default function AssignmentManagement() {
                               description: 'Rubric criteria management will be available after assignment is created.',
                             });
                           }}
+                          className="bg-course-detail-50 hover:bg-course-detail-full border-course-detail/30"
                         >
                           <ListChecks className="mr-2 h-4 w-4" />
                           Manage Rubric Criteria
@@ -796,10 +841,15 @@ export default function AssignmentManagement() {
                     variant="outline"
                     onClick={() => setDialogOpen(false)}
                     disabled={saving}
+                    className="hover:bg-course-detail-50"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={saving}>
+                  <Button 
+                    type="submit" 
+                    disabled={saving}
+                    className="bg-primary hover:bg-primary/90"
+                  >
                     {saving ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -817,99 +867,307 @@ export default function AssignmentManagement() {
           </Dialog>
         </div>
 
+        {/* Summary Statistics */}
+        {assignments.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Assignments</p>
+                    <p className="text-2xl font-bold">{assignments.length}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-primary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Active</p>
+                    <p className="text-2xl font-bold text-green-500">
+                      {assignments.filter(a => a.is_active).length}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Submissions</p>
+                    <p className="text-2xl font-bold text-blue-500">
+                      {assignments.reduce((acc, a) => acc + (a.submission_count || 0), 0)}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <Users className="h-6 w-6 text-blue-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Avg. Submissions</p>
+                    <p className="text-2xl font-bold text-purple-500">
+                      {assignments.length > 0 
+                        ? Math.round(assignments.reduce((acc, a) => acc + (a.submission_count || 0), 0) / assignments.length)
+                        : 0}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <TrendingUp className="h-6 w-6 text-purple-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Filters and Search */}
+        {assignments.length > 0 && (
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5 text-primary" />
+                Filters & Search
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-2">
+                  <Label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Search Assignments
+                  </Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search by title, description, or course..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 h-11"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Type</Label>
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      {ASSESSMENT_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Status</Label>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {courses.length > 0 && (
+                <div className="mt-4">
+                  <Label className="text-sm font-medium mb-2 block">Course</Label>
+                  <Select value={filterCourse} onValueChange={setFilterCourse}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Courses</SelectItem>
+                      {courses.map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          {course.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Assignments List */}
         {assignments.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No assignments created yet.</p>
-              <Button className="mt-4" onClick={openCreateDialog}>
+          <Card className="border-border/50">
+            <CardContent className="py-16 text-center bg-course-detail-20 rounded-lg">
+              <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-course-detail-40 flex items-center justify-center">
+                <FileText className="h-10 w-10 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">No Assignments Yet</h3>
+              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                Create your first assignment to start engaging with students
+              </p>
+              <Button onClick={openCreateDialog} className="bg-primary hover:bg-primary/90">
                 <Plus className="mr-2 h-4 w-4" />
                 Create First Assignment
               </Button>
             </CardContent>
           </Card>
+        ) : filteredAssignments.length === 0 ? (
+          <Card className="border-border/50">
+            <CardContent className="py-16 text-center bg-course-detail-20 rounded-lg">
+              <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-course-detail-40 flex items-center justify-center">
+                <Search className="h-10 w-10 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">No Assignments Found</h3>
+              <p className="text-muted-foreground mb-4">
+                Try adjusting your search or filter criteria
+              </p>
+              <Button variant="outline" onClick={() => {
+                setSearchQuery('');
+                setFilterType('all');
+                setFilterStatus('all');
+                setFilterCourse('all');
+              }}>
+                Clear Filters
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid gap-4">
-            {assignments.map((assignment) => (
-              <Card key={assignment.id}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-foreground">{assignment.title}</h3>
-                        <Badge variant={assignment.is_active ? 'default' : 'secondary'}>
-                          {assignment.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
-                      {assignment.description && (
-                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                          {assignment.description}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mb-2">
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {assignment.assessment_type || 'assignment'}
-                        </Badge>
-                        {assignment.course_title && (
-                          <span className="flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            {assignment.course_title}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                        {assignment.due_date && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Due: {format(new Date(assignment.due_date), 'MMM d, yyyy h:mm a')}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3" />
-                          Max: {assignment.max_score || 100} pts
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {assignment.submission_count || 0} submissions
-                        </span>
-                        {assignment.late_submission_allowed === false && (
-                          <Badge variant="outline" className="text-xs">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            No late submissions
-                          </Badge>
-                        )}
-                        {assignment.late_submission_allowed && assignment.late_penalty_per_day && assignment.late_penalty_per_day > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {assignment.late_penalty_per_day}% penalty/day
-                          </Badge>
-                        )}
-                      </div>
-                      {assignment.guidelines && (
-                        <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
-                          <strong>Guidelines:</strong> {assignment.guidelines}
+            {filteredAssignments.map((assignment) => (
+              <Card 
+                key={assignment.id} 
+                className="group hover:shadow-lg transition-all border-border/50 hover:border-course-detail/30"
+              >
+                <CardContent className="p-5">
+                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-4 mb-3">
+                        <div className="h-12 w-12 rounded-lg bg-course-detail-50 group-hover:bg-course-detail-full flex items-center justify-center transition-colors shrink-0">
+                          <FileText className="h-6 w-6 text-primary" />
                         </div>
-                      )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors mb-1">
+                                {assignment.title}
+                              </h3>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge 
+                                  className={`${
+                                    assignment.is_active 
+                                      ? 'bg-green-500 hover:bg-green-600 text-white' 
+                                      : 'bg-gray-500 hover:bg-gray-600 text-white'
+                                  } font-semibold`}
+                                >
+                                  {assignment.is_active ? 'Active' : 'Inactive'}
+                                </Badge>
+                                <Badge variant="outline" className="bg-course-detail-50 border-course-detail/30 capitalize font-medium">
+                                  {assignment.assessment_type || 'assignment'}
+                                </Badge>
+                                {assignment.course_title && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    {assignment.course_title}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {assignment.description && (
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                              {assignment.description}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-4 text-sm">
+                            {assignment.due_date && (
+                              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-course-detail-20">
+                                <Calendar className="h-4 w-4 text-primary" />
+                                <span className="font-medium text-foreground">
+                                  Due: {format(new Date(assignment.due_date), 'MMM d, yyyy h:mm a')}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-course-detail-20">
+                              <Award className="h-4 w-4 text-primary" />
+                              <span className="font-medium text-foreground">
+                                Max: {assignment.max_score || 100} pts
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-course-detail-20">
+                              <Users className="h-4 w-4 text-primary" />
+                              <span className="font-medium text-foreground">
+                                {assignment.submission_count || 0} submissions
+                              </span>
+                            </div>
+                            {assignment.late_submission_allowed === false && (
+                              <Badge variant="outline" className="bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400">
+                                <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
+                                No late submissions
+                              </Badge>
+                            )}
+                            {assignment.late_submission_allowed && assignment.late_penalty_per_day && assignment.late_penalty_per_day > 0 && (
+                              <Badge variant="outline" className="bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400">
+                                <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                {assignment.late_penalty_per_day}% penalty/day
+                              </Badge>
+                            )}
+                          </div>
+                          {assignment.guidelines && (
+                            <div className="mt-3 p-3 bg-course-detail-50 rounded-lg border border-course-detail/30">
+                              <p className="text-xs font-semibold text-primary mb-1 uppercase tracking-wide">Guidelines:</p>
+                              <p className="text-sm text-foreground leading-relaxed line-clamp-2">
+                                {assignment.guidelines}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0 lg:flex-col lg:items-end">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => navigate(`/admin/assignments/${assignment.id}/submissions`)}
+                        className="bg-course-detail-50 hover:bg-course-detail-full border-course-detail/30 hover:border-course-detail text-foreground font-semibold transition-all"
                       >
+                        <Eye className="mr-2 h-4 w-4" />
                         View Submissions
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(assignment)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        onClick={() => deleteAssignment(assignment.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => openEditDialog(assignment)}
+                          className="h-9 w-9 hover:bg-course-detail-50"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:bg-destructive/10 h-9 w-9"
+                          onClick={() => deleteAssignment(assignment.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

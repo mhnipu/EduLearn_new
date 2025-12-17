@@ -763,7 +763,7 @@ const AdminDashboard = () => {
               </Button>
 
               <Button 
-                onClick={() => navigate('/admin/cms')} 
+                onClick={() => navigate('/admin/site-content')} 
                 className="h-auto py-5 justify-start group hover:shadow-lg transition-all"
                 variant="outline"
               >
@@ -771,10 +771,26 @@ const AdminDashboard = () => {
                   <Layout className="h-5 w-5 text-amber-500" />
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold text-foreground">CMS Manager</div>
-                  <div className="text-xs text-muted-foreground">Edit landing page</div>
+                  <div className="font-semibold text-foreground">Site Content</div>
+                  <div className="text-xs text-muted-foreground">Edit landing content</div>
                 </div>
               </Button>
+
+              {role === 'super_admin' && (
+                <Button 
+                  onClick={() => navigate('/admin/landing-page-cms')} 
+                  className="h-auto py-5 justify-start group hover:shadow-lg transition-all"
+                  variant="outline"
+                >
+                  <div className="mr-3 h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                    <Layout className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-foreground">Landing Page CMS</div>
+                    <div className="text-xs text-muted-foreground">Manage sections & structure</div>
+                  </div>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

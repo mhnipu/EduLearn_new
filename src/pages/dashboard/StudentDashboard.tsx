@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   BookOpen, Award, Clock, Bookmark, Play, Library, FileText, TrendingUp, Target, CheckCircle2, 
   Zap, Star, Trophy, GraduationCap, ClipboardList, MessageSquare, Search, Filter, 
-  AlertCircle, Loader2, Book, Video, Calendar, ExternalLink, ChevronRight
+  AlertCircle, Loader2, Book, Video, Calendar, ExternalLink, ChevronRight, ArrowRight
 } from 'lucide-react';
 import {
   RadialBarChart, RadialBar, PieChart as RechartsPieChart, Pie, Cell,
@@ -75,6 +75,35 @@ interface LibraryItem {
   duration_minutes?: number;
 }
 
+interface AttendanceRecord {
+  id: string;
+  session_id: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+  notes: string | null;
+  attendance_sessions: {
+    id: string;
+    session_date: string;
+    session_time: string | null;
+    title: string | null;
+    courses: {
+      title: string;
+    };
+  };
+}
+
+interface GradeResult {
+  id: string;
+  title: string;
+  assessment_type: string;
+  course_title: string;
+  score: number | null;
+  max_score: number;
+  submitted_at: string | null;
+  graded_at: string | null;
+  feedback: string | null;
+  due_date: string | null;
+}
+
 const ASSESSMENT_TYPES = [
   { value: 'all', label: 'All Types', icon: FileText },
   { value: 'assignment', label: 'Assignments', icon: ClipboardList },
@@ -92,6 +121,8 @@ const StudentDashboard = () => {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [gradeResults, setGradeResults] = useState<GradeResult[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
   const [libraryLoading, setLibraryLoading] = useState(false);
@@ -192,10 +223,12 @@ const StudentDashboard = () => {
 
       setCertificates(certsData || []);
 
-      // Fetch assessments and library in parallel
+      // Fetch assessments, library, attendance, and grades in parallel
       await Promise.all([
         fetchAssessments(),
-        fetchLibraryContents()
+        fetchLibraryContents(),
+        fetchAttendanceRecords(),
+        fetchGradeResults()
       ]);
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -285,6 +318,186 @@ const StudentDashboard = () => {
       setAssessments([]);
     } finally {
       setAssessmentsLoading(false);
+    }
+  };
+
+  const fetchAttendanceRecords = async () => {
+    if (!user) return;
+    try {
+      // Fetch attendance records directly for this student
+      const { data: records, error } = await supabase
+        .from('attendance_records')
+        .select(`
+          id,
+          session_id,
+          status,
+          notes,
+          attendance_sessions (
+            id,
+            session_date,
+            session_time,
+            title,
+            course_id,
+            courses (
+              id,
+              title
+            )
+          )
+        `)
+        .eq('student_id', user.id)
+        .order('marked_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error fetching attendance records:', error);
+        setAttendanceRecords([]);
+        return;
+      }
+
+      if (records && records.length > 0) {
+        // Filter out records where session or course data is missing
+        const validRecords = records.filter((r: any) => 
+          r.attendance_sessions && r.attendance_sessions.courses
+        );
+
+        const formattedRecords: AttendanceRecord[] = validRecords.map((r: any) => ({
+          id: r.id,
+          session_id: r.session_id,
+          status: r.status,
+          notes: r.notes,
+          attendance_sessions: {
+            id: r.attendance_sessions.id,
+            session_date: r.attendance_sessions.session_date,
+            session_time: r.attendance_sessions.session_time,
+            title: r.attendance_sessions.title,
+            courses: {
+              title: r.attendance_sessions.courses.title,
+            },
+          },
+        }));
+
+        // Sort by date descending
+        formattedRecords.sort((a, b) => {
+          const dateA = new Date(a.attendance_sessions.session_date).getTime();
+          const dateB = new Date(b.attendance_sessions.session_date).getTime();
+          return dateB - dateA;
+        });
+
+        setAttendanceRecords(formattedRecords.slice(0, 20));
+      } else {
+        setAttendanceRecords([]);
+      }
+    } catch (error) {
+      console.error('Error fetching attendance records:', error);
+      setAttendanceRecords([]);
+    }
+  };
+
+  const fetchGradeResults = async () => {
+    if (!user) return;
+    try {
+      // Get enrolled course IDs
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('course_id')
+        .eq('user_id', user.id);
+
+      const courseIds = enrollments?.map(e => e.course_id) || [];
+      if (courseIds.length === 0) {
+        setGradeResults([]);
+        return;
+      }
+
+      // Fetch graded assignments
+      const { data: assignmentSubmissions } = await supabase
+        .from('assignment_submissions')
+        .select(`
+          id,
+          score,
+          submitted_at,
+          graded_at,
+          feedback,
+          assignments!inner (
+            id,
+            title,
+            assessment_type,
+            max_score,
+            due_date,
+            courses!inner (
+              title
+            )
+          )
+        `)
+        .eq('student_id', user.id)
+        .not('graded_at', 'is', null)
+        .order('graded_at', { ascending: false });
+
+      // Fetch graded quizzes
+      const { data: quizSubmissions } = await supabase
+        .from('quiz_submissions')
+        .select(`
+          id,
+          score,
+          passed,
+          submitted_at,
+          quizzes!inner (
+            id,
+            title,
+            passing_score,
+            courses!inner (
+              title
+            )
+          )
+        `)
+        .eq('student_id', user.id)
+        .not('submitted_at', 'is', null)
+        .order('submitted_at', { ascending: false });
+
+      const grades: GradeResult[] = [];
+
+      // Process assignment submissions
+      (assignmentSubmissions || []).forEach((sub: any) => {
+        grades.push({
+          id: sub.id,
+          title: sub.assignments?.title || 'Unknown',
+          assessment_type: sub.assignments?.assessment_type || 'assignment',
+          course_title: sub.assignments?.courses?.title || 'Unknown Course',
+          score: sub.score,
+          max_score: sub.assignments?.max_score || 100,
+          submitted_at: sub.submitted_at,
+          graded_at: sub.graded_at,
+          feedback: sub.feedback,
+          due_date: sub.assignments?.due_date,
+        });
+      });
+
+      // Process quiz submissions
+      (quizSubmissions || []).forEach((sub: any) => {
+        grades.push({
+          id: sub.id,
+          title: sub.quizzes?.title || 'Unknown',
+          assessment_type: 'quiz',
+          course_title: sub.quizzes?.courses?.title || 'Unknown Course',
+          score: sub.score,
+          max_score: sub.quizzes?.passing_score || 100,
+          submitted_at: sub.submitted_at,
+          graded_at: sub.submitted_at,
+          feedback: null,
+          due_date: null,
+        });
+      });
+
+      // Sort by graded_at descending
+      grades.sort((a, b) => {
+        const dateA = a.graded_at ? new Date(a.graded_at).getTime() : 0;
+        const dateB = b.graded_at ? new Date(b.graded_at).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      setGradeResults(grades.slice(0, 20));
+    } catch (error) {
+      console.error('Error fetching grade results:', error);
+      setGradeResults([]);
     }
   };
 
@@ -484,7 +697,6 @@ const StudentDashboard = () => {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList 
             className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex"
-            style={{ backgroundColor: 'rgba(247, 234, 224, 1)' }}
           >
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
@@ -574,24 +786,47 @@ const StudentDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   {assessments.slice(0, 3).length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       {assessments.slice(0, 3).map((assessment) => (
-                        <div key={assessment.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{assessment.title}</p>
-                            <p className="text-sm text-muted-foreground">{assessment.course_title}</p>
+                        <div 
+                          key={assessment.id} 
+                          className="group flex items-center justify-between p-3.5 rounded-lg bg-course-detail-50 hover:bg-course-detail-full transition-all cursor-pointer border border-transparent hover:border-course-detail/30 shadow-sm hover:shadow-md"
+                          onClick={() => navigate('/student/assignments')}
+                        >
+                          <div className="flex-1 min-w-0 pr-3">
+                            <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{assessment.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                              <BookOpen className="h-3 w-3" />
+                              {assessment.course_title}
+                            </p>
                           </div>
-                          <Badge variant={assessment.submission_status === 'graded' ? 'default' : assessment.submission_status === 'submitted' ? 'secondary' : 'outline'}>
+                          <Badge 
+                            className={`shrink-0 ${
+                              assessment.submission_status === 'graded' 
+                                ? 'bg-green-500 hover:bg-green-600 text-white' 
+                                : assessment.submission_status === 'submitted' 
+                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                : 'bg-course-detail hover:bg-course-detail/80 text-foreground'
+                            } transition-colors`}
+                          >
                             {assessment.submission_status === 'graded' ? 'Graded' : assessment.submission_status === 'submitted' ? 'Submitted' : 'Pending'}
                           </Badge>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No assessments yet</p>
+                    <div className="text-center py-8 bg-course-detail-20 rounded-lg">
+                      <ClipboardList className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                      <p className="text-sm text-muted-foreground">No assessments yet</p>
+                    </div>
                   )}
-                  <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/student/assignments')}>
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-4 bg-course-detail-50 hover:bg-course-detail-full border-course-detail/30 hover:border-course-detail text-foreground font-medium transition-all" 
+                    onClick={() => navigate('/student/assignments')}
+                  >
                     View All Assessments
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </CardContent>
               </Card>
@@ -607,7 +842,10 @@ const StudentDashboard = () => {
                   {certificates.length > 0 ? (
                     <div className="space-y-3">
                       {certificates.slice(0, 3).map((cert) => (
-                        <div key={cert.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                        <div 
+                          key={cert.id} 
+                          className="flex items-center justify-between p-3 rounded-lg bg-course-detail-50 hover:bg-course-detail-full transition-colors"
+                        >
                           <div>
                             <p className="font-medium">{cert.courses?.title}</p>
                             <p className="text-sm text-muted-foreground">
@@ -620,6 +858,124 @@ const StudentDashboard = () => {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">No certificates yet</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Attendance & Grades Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary" />
+                    Recent Attendance
+                  </CardTitle>
+                  <CardDescription>Your attendance records</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {attendanceRecords.length > 0 ? (
+                    <div className="space-y-3">
+                      {attendanceRecords.slice(0, 5).map((record) => (
+                        <div 
+                          key={record.id} 
+                          className="flex items-center justify-between p-3 rounded-lg bg-course-detail-50 hover:bg-course-detail-full transition-colors border border-course-detail/30"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate">
+                              {record.attendance_sessions.title || 'Class Session'}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {record.attendance_sessions.courses.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(record.attendance_sessions.session_date), 'MMM dd, yyyy')}
+                              {record.attendance_sessions.session_time && ` at ${record.attendance_sessions.session_time}`}
+                            </p>
+                          </div>
+                          <Badge 
+                            className={`ml-3 shrink-0 ${
+                              record.status === 'present' 
+                                ? 'bg-green-500 hover:bg-green-600 text-white'
+                                : record.status === 'late'
+                                ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                                : record.status === 'excused'
+                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                : 'bg-red-500 hover:bg-red-600 text-white'
+                            }`}
+                          >
+                            {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-course-detail-20 rounded-lg">
+                      <Calendar className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                      <p className="text-sm text-muted-foreground">No attendance records yet</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5 text-primary" />
+                    Grades & Results
+                  </CardTitle>
+                  <CardDescription>Your graded assessments</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {gradeResults.length > 0 ? (
+                    <div className="space-y-3">
+                      {gradeResults.slice(0, 5).map((grade) => {
+                        const percentage = grade.max_score > 0 
+                          ? Math.round((grade.score || 0) / grade.max_score * 100) 
+                          : 0;
+                        const isPassing = percentage >= 60;
+                        return (
+                          <div 
+                            key={grade.id} 
+                            className="p-3 rounded-lg bg-course-detail-50 hover:bg-course-detail-full transition-colors border border-course-detail/30"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm truncate">{grade.title}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {grade.course_title} • {grade.assessment_type}
+                                </p>
+                              </div>
+                              <div className="ml-3 text-right shrink-0">
+                                <p className={`font-bold text-lg ${isPassing ? 'text-green-500' : 'text-red-500'}`}>
+                                  {grade.score !== null ? grade.score : 'N/A'} / {grade.max_score}
+                                </p>
+                                <p className={`text-xs font-semibold ${isPassing ? 'text-green-500' : 'text-red-500'}`}>
+                                  {percentage}%
+                                </p>
+                              </div>
+                            </div>
+                            {grade.feedback && (
+                              <div className="mt-2 pt-2 border-t border-course-detail/30">
+                                <p className="text-xs text-muted-foreground italic line-clamp-2">
+                                  "{grade.feedback}"
+                                </p>
+                              </div>
+                            )}
+                            {grade.graded_at && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Graded: {format(new Date(grade.graded_at), 'MMM dd, yyyy')}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-course-detail-20 rounded-lg">
+                      <Award className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                      <p className="text-sm text-muted-foreground">No grades available yet</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

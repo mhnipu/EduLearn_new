@@ -29,6 +29,7 @@ import BookDetail from "./pages/library/BookDetail";
 import VideoDetail from "./pages/library/VideoDetail";
 import LessonManagement from "./pages/teacher/LessonManagement";
 import StudentManagement from "./pages/teacher/StudentManagement";
+import StudentDetail from "./pages/teacher/StudentDetail";
 import AttendanceManagement from "./pages/teacher/AttendanceManagement";
 import PendingApproval from "./pages/PendingApproval";
 import SuperAdminManagement from "./pages/admin/SuperAdminManagement";
@@ -39,6 +40,7 @@ import CourseWizard from "./pages/admin/CourseWizard";
 import AssignmentManagement from "./pages/admin/AssignmentManagement";
 import AssignmentSubmissions from "./pages/admin/AssignmentSubmissions";
 import SiteContent from "./pages/admin/SiteContent";
+import LandingPageCMS from "./pages/admin/LandingPageCMS";
 import StudentAssignments from "./pages/student/StudentAssignments";
 import QuizExamTaking from "./pages/student/QuizExamTaking";
 import ProfileCompletion from "./pages/ProfileCompletion";
@@ -194,6 +196,11 @@ const App = () => (
                   <SiteContent />
                 </ProtectedRoute>
               } />
+              <Route path="/admin/landing-page-cms" element={
+                <ProtectedRoute requiredRole="super_admin">
+                  <LandingPageCMS />
+                </ProtectedRoute>
+              } />
               <Route path="/admin/system-monitoring" element={
                 <ProtectedRoute 
                   allowRoles={['super_admin', 'admin']}
@@ -260,6 +267,11 @@ const App = () => (
               <Route path="/teacher/students" element={
                 <ProtectedRoute allowRoles={['teacher', 'super_admin', 'admin']}>
                   <StudentManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/teacher/students/:studentId" element={
+                <ProtectedRoute allowRoles={['teacher', 'super_admin', 'admin']}>
+                  <StudentDetail />
                 </ProtectedRoute>
               } />
               <Route path="/teacher/courses/:courseId/attendance" element={

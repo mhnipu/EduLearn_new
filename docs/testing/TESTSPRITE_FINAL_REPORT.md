@@ -182,7 +182,7 @@ If Testsprite MCP is configured in Cursor:
 
 ### Method 3: Command Line (if available)
 ```powershell
-.\invoke-testsprite-mcp.ps1
+.\scripts\invoke-testsprite-mcp.ps1
 ```
 
 ---
@@ -243,8 +243,8 @@ For complete testing, Testsprite may need:
 ### Execution Files
 - ✅ `testsprite-test-execution.md` - Detailed test plan
 - ✅ `testsprite-execution-summary.md` - Execution summary
-- ✅ `invoke-testsprite-mcp.ps1` - PowerShell execution script
-- ✅ `invoke-testsprite-mcp.sh` - Bash execution script
+- ✅ `scripts/invoke-testsprite-mcp.ps1` - PowerShell execution script
+- ✅ `scripts/invoke-testsprite-mcp.sh` - Bash execution script
 
 ### Documentation
 - ✅ `TESTSPRITE_SETUP.md` - Setup guide

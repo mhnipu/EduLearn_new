@@ -131,4 +131,4 @@ if (Test-Path $supabasePath) {
     Write-Host "https://supabase.com/dashboard/project/alazrdburoobipmofypc/sql/new" -ForegroundColor Cyan
 }
 
-Write-Host "`n📖 Full guide: APPLY_ALL_MIGRATIONS.md" -ForegroundColor Cyan
+Write-Host "`n📖 Full guide: docs/migrations/APPLY_ALL_MIGRATIONS.md" -ForegroundColor Cyan

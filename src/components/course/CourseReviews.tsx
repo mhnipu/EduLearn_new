@@ -138,7 +138,7 @@ export function CourseReviews({
           <CardContent className="space-y-6">
             {/* Write a Review */}
             {isLoggedIn && (
-              <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-3 p-4 bg-course-detail/50 rounded-lg">
                 <Textarea
                   placeholder="Write your review..."
                   value={newComment}

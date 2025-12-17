@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Users, Search, Mail, Phone, Calendar, BookOpen, TrendingUp, Clock, CheckCircle2, XCircle, Clock as ClockIcon, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Users, Search, Mail, Phone, Calendar, BookOpen, TrendingUp, Clock, CheckCircle2, XCircle, Clock as ClockIcon, AlertCircle, Eye } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -323,7 +323,7 @@ const StudentManagement = () => {
         .map((ac: any) => ac.courses)
         .filter(Boolean);
 
-      // Combine and deduplicate
+      // Combine created and assigned courses first
       const allCoursesMap = new Map<string, Course>();
       (createdCourses || []).forEach(c => allCoursesMap.set(c.id, c));
       assignedCourses.forEach((c: Course) => {
@@ -332,14 +332,61 @@ const StudentManagement = () => {
         }
       });
 
-      const allCourses = Array.from(allCoursesMap.values());
+      // Fetch courses where teacher has students enrolled (via teacher_students_with_guardians view)
+      try {
+        const { data: studentsViewData } = await (supabase as any)
+          .from('teacher_students_with_guardians')
+          .select('course_id, courses!inner(id, title)')
+          .eq('teacher_id', user?.id);
+
+        const coursesFromView = (studentsViewData || [])
+          .map((item: any) => item.courses)
+          .filter(Boolean);
+
+        coursesFromView.forEach((c: Course) => {
+          if (!allCoursesMap.has(c.id)) {
+            allCoursesMap.set(c.id, c);
+          }
+        });
+      } catch (viewError) {
+        console.warn('Could not fetch courses from view, trying alternative method:', viewError);
+        
+        // Fallback: Get courses from enrollments where teacher might have students
+        // This is a broader approach - get all courses and check if teacher has access
+        try {
+          const teacherCourseIds = Array.from(allCoursesMap.keys());
+          
+          if (teacherCourseIds.length > 0) {
+            // Get enrollments for courses teacher has access to
+            const { data: enrollmentsData } = await supabase
+              .from('course_enrollments')
+              .select('course_id, courses!inner(id, title)')
+              .in('course_id', teacherCourseIds);
+
+            const coursesWithEnrollments = (enrollmentsData || [])
+              .map((e: any) => e.courses)
+              .filter(Boolean);
+
+            coursesWithEnrollments.forEach((c: Course) => {
+              if (!allCoursesMap.has(c.id)) {
+                allCoursesMap.set(c.id, c);
+              }
+            });
+          }
+        } catch (fallbackError) {
+          console.warn('Fallback course fetch also failed:', fallbackError);
+        }
+      }
+
+      const allCourses = Array.from(allCoursesMap.values()).sort((a, b) => 
+        a.title.localeCompare(b.title)
+      );
       setCourses(allCourses);
 
       if (courseId && allCourses.find(c => c.id === courseId)) {
         setSelectedCourse(courseId);
-      } else if (allCourses.length > 0 && selectedCourse === 'all') {
-        setSelectedCourse(allCourses[0].id);
       }
+      // Don't auto-select first course - keep 'all' to show all students initially
     } catch (error) {
       console.error('Error fetching courses:', error);
       toast({
@@ -351,60 +398,196 @@ const StudentManagement = () => {
   };
 
   const fetchStudents = async () => {
-    if (selectedCourse === 'all') {
-      setStudents([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:141',message:'fetchStudents entry',data:{selectedCourse,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
-      // Use the new view that includes guardian information
-      const { data: studentsWithGuardians, error: viewError } = await (supabase as any)
-        .from('teacher_students_with_guardians')
-        .select('*')
-        .eq('teacher_id', user?.id)
-        .eq('course_id', selectedCourse)
-        .order('enrolled_at', { ascending: false });
+      
+      let studentsWithGuardians: any[] = [];
+      let viewError: any = null;
+
+      if (selectedCourse === 'all') {
+        // Fetch all students from all courses
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:410',message:'Fetching all students - view query start',data:{teacherId:user?.id,selectedCourse:'all'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
+        const { data, error } = await (supabase as any)
+          .from('teacher_students_with_guardians')
+          .select('*')
+          .eq('teacher_id', user?.id)
+          .order('enrolled_at', { ascending: false });
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:418',message:'View query result for all courses',data:{dataCount:data?.length||0,hasError:!!error,errorMessage:error?.message||null,errorCode:error?.code||null,firstStudent:data?.[0]?.student_id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
+        studentsWithGuardians = data || [];
+        viewError = error;
+      } else {
+        // Fetch students for specific course
+        const { data, error } = await (supabase as any)
+          .from('teacher_students_with_guardians')
+          .select('*')
+          .eq('teacher_id', user?.id)
+          .eq('course_id', selectedCourse)
+          .order('enrolled_at', { ascending: false });
+        
+        studentsWithGuardians = data || [];
+        viewError = error;
+      }
       
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:149',message:'view query result',data:{count:studentsWithGuardians?.length||0,hasError:!!viewError,errorMsg:viewError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
 
-      // If view has error or returns 0 results, fallback to manual query
+      // If view has error or returns 0 results, try alternative approach for 'all' courses
       if (viewError || !studentsWithGuardians || studentsWithGuardians.length === 0) {
-        if (viewError) {
-          console.warn('View not available, falling back to manual query:', viewError);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:438',message:'View returned empty or error - checking fallback',data:{selectedCourse,hasError:!!viewError,errorMsg:viewError?.message||null,studentsCount:studentsWithGuardians?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        if (selectedCourse === 'all') {
+          // For 'all' courses, try fetching from enrollments directly
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:443',message:'Attempting alternative fetch for all courses',data:{teacherId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          
+          // Get teacher's courses first
+          const { data: teacherCourses } = await supabase
+            .from('courses')
+            .select('id, title')
+            .eq('created_by', user?.id);
+          
+          const { data: assignedCoursesData } = await (supabase as any)
+            .from('teacher_course_assignments')
+            .select('course_id, courses!inner(id, title)')
+            .eq('teacher_id', user?.id);
+          
+          const assignedCourses = (assignedCoursesData || [])
+            .map((ac: any) => ac.courses)
+            .filter(Boolean);
+          
+          const allCourseIds = [
+            ...(teacherCourses || []).map(c => c.id),
+            ...assignedCourses.map((c: any) => c.id)
+          ];
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:460',message:'Teacher courses identified',data:{createdCount:teacherCourses?.length||0,assignedCount:assignedCourses.length,totalCourseIds:allCourseIds.length,courseIds:allCourseIds},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          
+          if (allCourseIds.length > 0) {
+            // Fetch enrollments for all teacher's courses (without nested profiles)
+            const { data: enrollments, error: enrollError } = await supabase
+              .from('course_enrollments')
+              .select(`
+                user_id,
+                course_id,
+                enrolled_at,
+                courses!inner(id, title)
+              `)
+              .in('course_id', allCourseIds)
+              .order('enrolled_at', { ascending: false });
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:475',message:'Enrollments fetched for all courses',data:{enrollmentsCount:enrollments?.length||0,hasError:!!enrollError,errorMsg:enrollError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            
+            if (enrollments && enrollments.length > 0) {
+              // Extract unique user IDs
+              const userIds = [...new Set(enrollments.map((e: any) => e.user_id))];
+              
+              // Fetch profiles separately
+              const { data: profiles, error: profileError } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url, email, phone')
+                .in('id', userIds);
+              
+              if (profileError) {
+                console.warn('Error fetching profiles:', profileError);
+              }
+              
+              // Create a map for quick lookup
+              const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+              
+              // Transform to match expected format
+              studentsWithGuardians = enrollments.map((e: any) => {
+                const profile = profilesMap.get(e.user_id);
+                return {
+                  student_id: e.user_id,
+                  student_name: profile?.full_name || 'Unknown',
+                  student_email: profile?.email || null,
+                  student_phone: profile?.phone || null,
+                  student_avatar: profile?.avatar_url || null,
+                  course_id: e.course_id,
+                  course_title: e.courses?.title || 'Unknown Course',
+                  enrolled_at: e.enrolled_at,
+                  effective_guardian_name: null,
+                  effective_guardian_email: null,
+                  effective_guardian_phone: null,
+                  guardian_name: null,
+                  guardian_email: null,
+                  guardian_phone: null,
+                  guardian_relationship: null,
+                };
+              });
+              
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:497',message:'Transformed enrollments to students format',data:{transformedCount:studentsWithGuardians.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              // #endregion
+            }
+          }
         } else {
-          console.warn('View returned 0 students, falling back to manual query to verify');
+          // For specific course, use manual fetch
+          if (viewError) {
+            console.warn('View not available, falling back to manual query:', viewError);
+          } else {
+            console.warn('View returned 0 students, falling back to manual query to verify');
+          }
+          await fetchStudentsManual();
+          return;
         }
-        await fetchStudentsManual();
-        return;
       }
 
-      // Get course lessons count for progress calculation
-      const { count: totalLessons } = await (supabase as any)
-        .from('lessons')
-        .select('*', { count: 'exact', head: true })
-        .eq('course_id', selectedCourse);
+      // Get progress for each student - fetch all data in parallel for better performance
+      const courseIds = [...new Set(studentsWithGuardians.map((s: any) => s.course_id))];
+      
+      // Fetch all lessons counts for all courses at once
+      const lessonsCountPromises = courseIds.map(async (courseId: string) => {
+        const { count } = await (supabase as any)
+          .from('lessons')
+          .select('*', { count: 'exact', head: true })
+          .eq('course_id', courseId);
+        return { courseId, count: count || 0 };
+      });
+      
+      const lessonsCounts = await Promise.all(lessonsCountPromises);
+      const lessonsCountMap = new Map(lessonsCounts.map(l => [l.courseId, l.count]));
 
       // Get progress for each student
       const studentsWithData = await Promise.all(
         studentsWithGuardians.map(async (student: any) => {
-          // Get completed lessons count
-          const { count: completedLessons } = await (supabase as any)
+          const courseId = student.course_id;
+          const totalLessons = lessonsCountMap.get(courseId) || 0;
+
+          // Get completed lessons count for this specific student-course combination
+          const { count: completedLessons, error: progressError } = await (supabase as any)
             .from('learning_progress')
             .select('*', { count: 'exact', head: true })
             .eq('student_id', student.student_id)
-            .eq('course_id', selectedCourse)
+            .eq('course_id', courseId)
             .eq('completed', true);
 
-          const progress = totalLessons && totalLessons > 0
-            ? Math.round(((completedLessons || 0) / totalLessons) * 100)
-            : (student.progress_percentage || 0);
+          if (progressError) {
+            console.warn(`Error fetching progress for student ${student.student_id} in course ${courseId}:`, progressError);
+          }
+
+          const completedCount = completedLessons || 0;
+          const progress = totalLessons > 0
+            ? Math.round((completedCount / totalLessons) * 100)
+            : 0;
 
           return {
             id: student.student_id,
@@ -413,11 +596,11 @@ const StudentManagement = () => {
             email: student.student_email || undefined,
             phone: student.student_phone || undefined,
             enrolled_at: student.enrolled_at,
-            course_id: student.course_id,
+            course_id: courseId,
             course_title: student.course_title || 'Unknown Course',
-            progress,
-            completed_lessons: completedLessons || 0,
-            total_lessons: totalLessons || 0,
+            progress: Math.min(progress, 100), // Ensure progress doesn't exceed 100%
+            completed_lessons: completedCount,
+            total_lessons: totalLessons,
             // Guardian information
             guardian_name: student.effective_guardian_name || student.guardian_name || null,
             guardian_email: student.effective_guardian_email || student.guardian_email || null,
@@ -428,8 +611,16 @@ const StudentManagement = () => {
         })
       );
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:508',message:'Setting students state',data:{studentsCount:studentsWithData.length,selectedCourse},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      
       setStudents(studentsWithData);
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:513',message:'Error in fetchStudents',data:{errorMessage:error instanceof Error ? error.message : String(error),selectedCourse},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      
       console.error('Error fetching students:', error);
       toast({
         title: 'Error',
@@ -445,6 +636,13 @@ const StudentManagement = () => {
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:237',message:'fetchStudentsManual entry',data:{selectedCourse,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     // #endregion
+    
+    // Manual fetch only works for specific courses, not 'all'
+    if (selectedCourse === 'all') {
+      setStudents([]);
+      setLoading(false);
+      return;
+    }
     
     try {
       // Step 1: Get course information
@@ -547,10 +745,14 @@ const StudentManagement = () => {
       }
 
       // Step 6: Get total lessons count
-      const { count: totalLessons } = await (supabase as any)
+      const { count: totalLessons, error: lessonsError } = await (supabase as any)
         .from('lessons')
         .select('*', { count: 'exact', head: true })
         .eq('course_id', selectedCourse);
+
+      if (lessonsError) {
+        console.warn('Error fetching lessons count:', lessonsError);
+      }
 
       // Step 7: Build student data with progress
       const studentsWithData = await Promise.all(
@@ -558,15 +760,22 @@ const StudentManagement = () => {
           const profile = (profiles as any)?.find((p: any) => p.id === enrollment.user_id);
           const guardianInfo = guardianMap.get(enrollment.user_id);
 
-          const { count: completedLessons } = await (supabase as any)
+          // Get completed lessons count for this student in this course
+          const { count: completedLessons, error: progressError } = await (supabase as any)
             .from('learning_progress')
             .select('*', { count: 'exact', head: true })
             .eq('student_id', enrollment.user_id)
             .eq('course_id', selectedCourse)
             .eq('completed', true);
 
-          const progress = totalLessons && totalLessons > 0
-            ? Math.round(((completedLessons || 0) / totalLessons) * 100)
+          if (progressError) {
+            console.warn(`Error fetching progress for student ${enrollment.user_id}:`, progressError);
+          }
+
+          const completedCount = completedLessons || 0;
+          const totalCount = totalLessons || 0;
+          const progress = totalCount > 0
+            ? Math.round((completedCount / totalCount) * 100)
             : 0;
 
           return {
@@ -578,9 +787,9 @@ const StudentManagement = () => {
             enrolled_at: enrollment.enrolled_at,
             course_id: enrollment.course_id,
             course_title: courseData?.title || 'Unknown Course',
-            progress,
-            completed_lessons: completedLessons || 0,
-            total_lessons: totalLessons || 0,
+            progress: Math.min(progress, 100), // Ensure progress doesn't exceed 100%
+            completed_lessons: completedCount,
+            total_lessons: totalCount,
             // Guardian information - prefer relationship data, fallback to profile fields
             guardian_name: guardianInfo?.name || profile?.guardian_name || null,
             guardian_email: guardianInfo?.email || profile?.guardian_email || null,
@@ -610,7 +819,10 @@ const StudentManagement = () => {
 
   const filteredStudents = students.filter(student =>
     student.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    student.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.course_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.guardian_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getInitials = (name: string) => {
@@ -659,23 +871,103 @@ const StudentManagement = () => {
               </p>
             </div>
           </div>
+          {selectedCourse !== 'all' && (
+            <Button
+              onClick={() => navigate(`/teacher/courses/${selectedCourse}/attendance`)}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md hover:shadow-lg transition-all"
+              size="lg"
+            >
+              <Calendar className="mr-2 h-5 w-5" />
+              Manage Attendance
+            </Button>
+          )}
         </div>
 
+        {/* Summary Stats */}
+        {selectedCourse !== 'all' && filteredStudents.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Students</p>
+                    <p className="text-2xl font-bold">{filteredStudents.length}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Average Progress</p>
+                    <p className="text-2xl font-bold">
+                      {Math.round(filteredStudents.reduce((acc, s) => acc + (s.progress || 0), 0) / filteredStudents.length)}%
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <TrendingUp className="h-6 w-6 text-green-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Completed Lessons</p>
+                    <p className="text-2xl font-bold">
+                      {filteredStudents.reduce((acc, s) => acc + (s.completed_lessons || 0), 0)}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6 text-blue-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Lessons</p>
+                    <p className="text-2xl font-bold">
+                      {filteredStudents.reduce((acc, s) => acc + (s.total_lessons || 0), 0)}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <BookOpen className="h-6 w-6 text-purple-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Filters */}
-        <Card>
+        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Filters</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary" />
+              Filters & Search
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Course</label>
+                <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Course
+                </label>
                 <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue placeholder="Select a course" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Courses</SelectItem>
+                    <SelectItem value="all">All Courses ({courses.length})</SelectItem>
                     {courses.map(course => (
                       <SelectItem key={course.id} value={course.id}>
                         {course.title}
@@ -685,14 +977,17 @@ const StudentManagement = () => {
                 </Select>
               </div>
               <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Search Students</label>
+                <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  Search Students
+                </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
-                    placeholder="Search by name or email..."
+                    placeholder="Search by name, email, or course..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 h-11"
                   />
                 </div>
               </div>
@@ -708,159 +1003,157 @@ const StudentManagement = () => {
                 <CardTitle>Enrolled Students</CardTitle>
                 <CardDescription>
                   {selectedCourse === 'all'
-                    ? 'Select a course to view students'
+                    ? `${filteredStudents.length} student${filteredStudents.length !== 1 ? 's' : ''} across all courses`
                     : `${filteredStudents.length} student${filteredStudents.length !== 1 ? 's' : ''} enrolled`}
                 </CardDescription>
               </div>
-              {selectedCourse !== 'all' && (
-                <Button
-                  onClick={() => navigate(`/teacher/courses/${selectedCourse}/attendance`)}
-                  variant="outline"
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Manage Attendance
-                </Button>
-              )}
             </div>
           </CardHeader>
           <CardContent>
-            {selectedCourse === 'all' ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Please select a course to view enrolled students</p>
+            {selectedCourse === 'all' && (
+              <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-blue-500" />
+                  <p className="text-sm text-muted-foreground">
+                    Select a specific course to manage attendance for that course.
+                  </p>
+                </div>
               </div>
-            ) : filteredStudents.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No students found</p>
+            )}
+            {filteredStudents.length === 0 ? (
+              <div className="text-center py-16 bg-course-detail/20 rounded-xl">
+                <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-course-detail/40 flex items-center justify-center">
+                  <Users className="h-10 w-10 text-muted-foreground/50" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">No Students Found</h3>
+                <p className="text-muted-foreground mb-2 max-w-md mx-auto">
+                  {searchQuery 
+                    ? `No students match "${searchQuery}". Try a different search term.`
+                    : 'No students are enrolled in this course yet.'}
+                </p>
+                {!searchQuery && (
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => navigate('/admin/enrollments')}
+                  >
+                    Enroll Students
+                  </Button>
+                )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
+              <div className="overflow-x-auto -mx-4 px-4 scrollbar-thin">
+                <Table className="min-w-full">
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Guardian</TableHead>
-                      <TableHead>Enrollment Date</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Lessons</TableHead>
-                      <TableHead>Attendance</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-course-detail/20 hover:bg-course-detail/30">
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider">Student</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider">Contact</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider">Guardian</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider">Enrollment Date</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider">Progress</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider">Lessons</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredStudents.map((student) => (
-                      <TableRow key={student.id}>
-                        <TableCell>
+                      <TableRow key={`${student.id}-${student.course_id}`} className="hover:bg-course-detail/10 transition-colors border-b border-border/50">
+                        <TableCell className="min-w-[200px]">
                           <div className="flex items-center gap-3">
-                            <Avatar>
+                            <Avatar className="h-10 w-10 border-2 border-course-detail/30">
                               <AvatarImage src={student.avatar_url || undefined} />
-                              <AvatarFallback>
+                              <AvatarFallback className="bg-course-detail/20 text-foreground font-semibold">
                                 {getInitials(student.full_name || 'U')}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <div className="font-medium">{student.full_name}</div>
-                              <div className="text-sm text-muted-foreground">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-sm truncate">{student.full_name}</div>
+                              <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                <BookOpen className="h-3 w-3" />
                                 {student.course_title}
                               </div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
+                        <TableCell className="min-w-[180px]">
+                          <div className="space-y-1.5">
                             {student.email && (
                               <div className="flex items-center gap-2 text-sm">
-                                <Mail className="h-3 w-3" />
-                                <span className="text-muted-foreground">{student.email}</span>
+                                <Mail className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-muted-foreground truncate">{student.email}</span>
                               </div>
                             )}
                             {student.phone && (
                               <div className="flex items-center gap-2 text-sm">
-                                <Phone className="h-3 w-3" />
+                                <Phone className="h-3.5 w-3.5 text-primary" />
                                 <span className="text-muted-foreground">{student.phone}</span>
                               </div>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="space-y-1 min-w-[200px]">
+                        <TableCell className="min-w-[200px]">
+                          <div className="space-y-1.5">
                             {student.guardian_name ? (
                               <>
-                                <div className="font-medium text-sm">{student.guardian_name}</div>
+                                <div className="font-semibold text-sm">{student.guardian_name}</div>
                                 {student.guardian_relationship && (
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="outline" className="text-xs bg-course-detail/10 border-course-detail/30">
                                     {student.guardian_relationship}
                                   </Badge>
                                 )}
                                 {student.guardian_email && (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Mail className="h-3 w-3" />
-                                    {student.guardian_email}
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Mail className="h-3 w-3 text-primary" />
+                                    <span className="truncate">{student.guardian_email}</span>
                                   </div>
                                 )}
                                 {student.guardian_phone && (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Phone className="h-3 w-3" />
-                                    {student.guardian_phone}
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Phone className="h-3 w-3 text-primary" />
+                                    <span>{student.guardian_phone}</span>
                                   </div>
                                 )}
                               </>
                             ) : (
-                              <span className="text-sm text-muted-foreground italic">No guardian info</span>
+                              <span className="text-xs text-muted-foreground italic">No guardian info</span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[140px]">
                           <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                            {new Date(student.enrolled_at).toLocaleDateString()}
+                            <Calendar className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-muted-foreground">{new Date(student.enrolled_at).toLocaleDateString()}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 bg-muted rounded-full h-2">
+                        <TableCell className="min-w-[140px]">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-[80px] bg-course-detail rounded-full h-2.5 overflow-hidden">
                               <div
-                                className={`h-2 rounded-full ${getProgressColor(student.progress || 0)}`}
-                                style={{ width: `${student.progress || 0}%` }}
+                                className={`h-full rounded-full transition-all ${getProgressColor(student.progress || 0)}`}
+                                style={{ width: `${Math.min(student.progress || 0, 100)}%` }}
                               />
                             </div>
-                            <span className="text-sm font-medium">{student.progress || 0}%</span>
+                            <span className="text-sm font-semibold min-w-[35px] text-right">{student.progress || 0}%</span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[100px]">
                           <div className="flex items-center gap-2 text-sm">
-                            <BookOpen className="h-3 w-3 text-muted-foreground" />
-                            <span>
+                            <BookOpen className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-muted-foreground">
                               {student.completed_lessons || 0} / {student.total_lessons || 0}
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getAttendanceIcon(student.attendanceStatus)}
-                            {getAttendanceBadge(student.attendanceStatus)}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openAttendanceDialog(student)}
-                              className="h-7 px-2"
-                            >
-                              {student.attendanceStatus ? 'Update' : 'Mark'}
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/teacher/students/${student.id}`)}
-                            >
-                              View Details
-                            </Button>
-                          </div>
+                        <TableCell className="min-w-[140px] text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/teacher/students/${student.id}`)}
+                            className="bg-course-detail-50 hover:bg-course-detail-full border-course-detail/30 hover:border-course-detail text-foreground font-semibold transition-all"
+                          >
+                            <Eye className="mr-2 h-3.5 w-3.5" />
+                            View Details
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}

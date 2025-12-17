@@ -211,76 +211,93 @@ export default function StudentAssignments() {
     const isSubmitted = !!submission;
 
     return (
-      <Card>
-        <CardContent className="p-4">
+      <Card className="group hover:shadow-lg transition-all border-border/50 hover:border-course-detail/30">
+        <CardContent className="p-5">
           <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-foreground">{assignment.title}</h3>
-                {assignment.description && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                    {assignment.description}
-                  </p>
-                )}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-course-detail-50 group-hover:bg-course-detail-full flex items-center justify-center transition-colors shrink-0">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">{assignment.title}</h3>
+                    {assignment.description && (
+                      <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
+                        {assignment.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
                 {isGraded ? (
-                  <Badge variant="default">
-                    <CheckCircle className="h-3 w-3 mr-1" />
+                  <Badge className="bg-green-500 hover:bg-green-600 text-white font-semibold">
+                    <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
                     {submission.score}/{assignment.max_score}
                   </Badge>
                 ) : isSubmitted ? (
-                  <Badge variant="secondary">
-                    <Clock className="h-3 w-3 mr-1" />
+                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white font-semibold">
+                    <Clock className="h-3.5 w-3.5 mr-1.5" />
                     Submitted
                   </Badge>
                 ) : isOverdue ? (
-                  <Badge variant="destructive">
-                    <AlertCircle className="h-3 w-3 mr-1" />
+                  <Badge variant="destructive" className="font-semibold">
+                    <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
                     Overdue
                   </Badge>
-                ) : null}
+                ) : (
+                  <Badge className="bg-course-detail hover:bg-course-detail/80 text-foreground font-semibold">
+                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                    Pending
+                  </Badge>
+                )}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pl-13">
               {assignment.due_date && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Due: {format(new Date(assignment.due_date), 'MMM d, yyyy h:mm a')}
+                <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-course-detail-20">
+                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                  <span className="font-medium">Due: {format(new Date(assignment.due_date), 'MMM d, yyyy h:mm a')}</span>
                 </span>
               )}
-              <span className="flex items-center gap-1">
-                <FileText className="h-3 w-3" />
-                Max: {assignment.max_score} pts
+              <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-course-detail-20">
+                <FileText className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">Max: {assignment.max_score} pts</span>
               </span>
             </div>
 
             {assignment.attachment_url && (
-              <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
-                <FileText className="h-4 w-4 text-primary" />
+              <div className="flex items-center gap-2.5 p-3 bg-course-detail-50 hover:bg-course-detail-full rounded-lg transition-colors border border-course-detail/30">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
                 <a
                   href={assignment.attachment_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                  className="text-sm text-primary hover:underline flex items-center gap-1.5 font-medium"
                 >
-                  <Download className="h-3 w-3" />
+                  <Download className="h-3.5 w-3.5" />
                   Download Assignment File
                 </a>
               </div>
             )}
 
             {isGraded && submission.feedback && (
-              <div className="border-l-2 border-primary pl-3 bg-muted/30 py-2 rounded-r">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Feedback:</p>
-                <p className="text-sm text-foreground">{submission.feedback}</p>
+              <div className="border-l-3 border-primary pl-4 bg-course-detail-20 py-3 rounded-r-lg">
+                <p className="text-xs font-semibold text-primary mb-1.5 uppercase tracking-wide">Feedback:</p>
+                <p className="text-sm text-foreground leading-relaxed">{submission.feedback}</p>
               </div>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-2">
               {!isGraded && (
-                <Button variant="outline" size="sm" onClick={() => openSubmitDialog(assignment)}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => openSubmitDialog(assignment)}
+                  className="bg-course-detail-50 hover:bg-course-detail-full border-course-detail/30 hover:border-course-detail text-foreground font-semibold transition-all"
+                >
                   {isSubmitted ? (
                     <>
                       <Upload className="h-4 w-4 mr-2" />
@@ -289,7 +306,7 @@ export default function StudentAssignments() {
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
-                      Submit
+                      Submit Assignment
                     </>
                   )}
                 </Button>
@@ -314,39 +331,57 @@ export default function StudentAssignments() {
           </div>
         </div>
 
-        <Tabs defaultValue="pending">
-          <TabsList>
-            <TabsTrigger value="pending">
+        <Tabs defaultValue="pending" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 bg-course-detail-20 p-1">
+            <TabsTrigger 
+              value="pending" 
+              className="data-[state=active]:bg-course-detail-full data-[state=active]:text-foreground font-semibold transition-all"
+            >
+              <Clock className="h-4 w-4 mr-2" />
               Pending ({pendingAssignments.length})
             </TabsTrigger>
-            <TabsTrigger value="completed">
+            <TabsTrigger 
+              value="completed"
+              className="data-[state=active]:bg-course-detail-full data-[state=active]:text-foreground font-semibold transition-all"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
               Completed ({completedAssignments.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pending" className="space-y-4 mt-4">
+          <TabsContent value="pending" className="space-y-4 mt-6">
             {pendingAssignments.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No pending assignments!</p>
+              <Card className="border-border/50">
+                <CardContent className="py-16 text-center bg-course-detail-20 rounded-lg">
+                  <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-course-detail-40 flex items-center justify-center">
+                    <CheckCircle className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No Pending Assignments!</h3>
+                  <p className="text-muted-foreground">You're all caught up. Great work!</p>
                 </CardContent>
               </Card>
             ) : (
-              pendingAssignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)
+              <div className="space-y-4">
+                {pendingAssignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)}
+              </div>
             )}
           </TabsContent>
 
-          <TabsContent value="completed" className="space-y-4 mt-4">
+          <TabsContent value="completed" className="space-y-4 mt-6">
             {completedAssignments.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No completed assignments yet.</p>
+              <Card className="border-border/50">
+                <CardContent className="py-16 text-center bg-course-detail-20 rounded-lg">
+                  <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-course-detail-40 flex items-center justify-center">
+                    <FileText className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No Completed Assignments</h3>
+                  <p className="text-muted-foreground">Complete your pending assignments to see them here.</p>
                 </CardContent>
               </Card>
             ) : (
-              completedAssignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)
+              <div className="space-y-4">
+                {completedAssignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)}
+              </div>
             )}
           </TabsContent>
         </Tabs>
@@ -359,8 +394,8 @@ export default function StudentAssignments() {
             </DialogHeader>
             <div className="space-y-4">
               {submittingTo?.description && (
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-sm text-muted-foreground">{submittingTo.description}</p>
+                <div className="bg-course-detail-50 rounded-lg p-4 border border-course-detail/30">
+                  <p className="text-sm text-foreground leading-relaxed">{submittingTo.description}</p>
                 </div>
               )}
               <div className="space-y-2">

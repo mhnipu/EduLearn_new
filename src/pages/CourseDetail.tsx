@@ -543,14 +543,6 @@ export default function CourseDetail() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList 
                 className={`grid w-full ${isInstructor ? 'grid-cols-5' : 'grid-cols-4'} max-w-2xl`}
-                style={{
-                  backgroundClip: 'unset',
-                  WebkitBackgroundClip: 'unset',
-                  color: 'rgba(0, 0, 0, 1)',
-                  background: 'unset',
-                  backgroundColor: 'rgba(247, 234, 224, 1)',
-                  backgroundImage: 'none',
-                }}
               >
                 <TabsTrigger value="overview" className="flex items-center gap-2 text-xs sm:text-sm">
                   <BarChart3 className="h-4 w-4 hidden sm:block" />

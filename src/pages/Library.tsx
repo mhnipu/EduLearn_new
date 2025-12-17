@@ -228,7 +228,6 @@ export default function Library() {
       <Tabs defaultValue="books" className="w-full">
         <TabsList 
           className="grid w-full md:w-[400px] grid-cols-2"
-          style={{ backgroundColor: 'rgba(248, 234, 226, 1)' }}
         >
           <TabsTrigger value="books">
             <BookOpen className="mr-2 h-4 w-4" />

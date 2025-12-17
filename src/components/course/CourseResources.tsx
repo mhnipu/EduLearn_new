@@ -157,7 +157,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
   return (
     <div className="space-y-6">
       {!isEnrolled && (
-        <Card className="bg-muted/50 border-amber-500/30">
+        <Card className="bg-course-detail/50 border-amber-500/30">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
               <Lock className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {books.map((book) => (
                 <Card key={book.id} className="overflow-hidden">
-                  <div className="aspect-[3/4] bg-muted relative">
+                  <div className="aspect-[3/4] bg-course-detail relative">
                     {book.thumbnail_url ? (
                       <img 
                         src={book.thumbnail_url} 
@@ -241,7 +241,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {videos.map((video) => (
                 <Card key={video.id} className="overflow-hidden">
-                  <div className="aspect-video bg-muted relative">
+                  <div className="aspect-video bg-course-detail relative">
                     {video.thumbnail_url ? (
                       <img 
                         src={video.thumbnail_url} 

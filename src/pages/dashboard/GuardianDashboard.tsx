@@ -8,11 +8,13 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
-import { Users, BookOpen, Award, TrendingUp, Target, Eye, Shield, CheckCircle2, Clock, Trophy, Star, BarChart3, FileText, GraduationCap, ChevronDown, ChevronUp, Mail, Phone, Book, Video, Library } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, BookOpen, Award, TrendingUp, Target, Eye, Shield, CheckCircle2, Clock, Trophy, Star, BarChart3, FileText, GraduationCap, ChevronDown, ChevronUp, Mail, Phone, Book, Video, Library, Calendar, XCircle, UserCheck } from 'lucide-react';
 import {
   RadialBarChart, RadialBar, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
+import { format } from 'date-fns';
 
 interface Teacher {
   id: string;
@@ -99,6 +101,20 @@ interface LibraryItem {
   progress?: number;
 }
 
+interface StudentAttendance {
+  studentId: string;
+  studentName: string;
+  records: {
+    id: string;
+    sessionDate: string;
+    sessionTime: string | null;
+    sessionTitle: string | null;
+    courseTitle: string;
+    status: 'present' | 'absent' | 'late' | 'excused';
+    notes: string | null;
+  }[];
+}
+
 const GuardianDashboard = () => {
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
@@ -110,6 +126,7 @@ const GuardianDashboard = () => {
   const [studentExams, setStudentExams] = useState<Record<string, StudentExam[]>>({});
   const [studentLibraryItems, setStudentLibraryItems] = useState<Record<string, LibraryItem[]>>({});
   const [studentTeachers, setStudentTeachers] = useState<Record<string, Teacher[]>>({});
+  const [studentAttendance, setStudentAttendance] = useState<Record<string, StudentAttendance['records']>>({});
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -680,6 +697,59 @@ const GuardianDashboard = () => {
         }));
         setStudentQuizzes(prev => ({ ...prev, [studentId]: quizzesList }));
 
+        // Fetch attendance records for this student
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance_records')
+          .select(`
+            id,
+            status,
+            notes,
+            marked_at,
+            attendance_sessions (
+              id,
+              session_date,
+              session_time,
+              title,
+              course_id,
+              courses (
+                id,
+                title
+              )
+            )
+          `)
+          .eq('student_id', studentId)
+          .order('marked_at', { ascending: false })
+          .limit(50);
+
+        if (attendanceError) {
+          console.error(`Error fetching attendance for student ${studentId}:`, attendanceError);
+          setStudentAttendance(prev => ({ ...prev, [studentId]: [] }));
+        } else {
+          // Filter out records where session or course data is missing
+          const validRecords = (attendanceData || []).filter((ar: any) => 
+            ar.attendance_sessions && ar.attendance_sessions.courses
+          );
+
+          const attendanceRecords = validRecords.map((ar: any) => ({
+            id: ar.id,
+            sessionDate: ar.attendance_sessions.session_date,
+            sessionTime: ar.attendance_sessions.session_time,
+            sessionTitle: ar.attendance_sessions.title,
+            courseTitle: ar.attendance_sessions.courses.title,
+            status: ar.status,
+            notes: ar.notes,
+          }));
+
+          // Sort by date descending
+          attendanceRecords.sort((a, b) => {
+            const dateA = new Date(a.sessionDate).getTime();
+            const dateB = new Date(b.sessionDate).getTime();
+            return dateB - dateA;
+          });
+
+          setStudentAttendance(prev => ({ ...prev, [studentId]: attendanceRecords.slice(0, 20) }));
+        }
+
         const student = studentsWithProfiles.find(s => s.student_id === studentId);
 
         return {
@@ -745,6 +815,28 @@ const GuardianDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-blue-500/5">
       <div className="max-w-[1600px] mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+        {/* Read-Only Notice Banner */}
+        <div className="bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1 flex items-center gap-2">
+                Read-Only Access
+                <Badge variant="outline" className="text-xs border-blue-500 text-blue-700 dark:text-blue-300">
+                  View Only
+                </Badge>
+              </h3>
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                As a guardian, you have <strong>read-only access</strong> to your children's educational information. 
+                You can view their courses, assignments, grades, attendance, and progress, but cannot modify or update any data.
+                All changes must be made through the student's account or by contacting the school administrator.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Enhanced Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-border/50 shadow-sm">
           <div className="space-y-2">
@@ -753,8 +845,12 @@ const GuardianDashboard = () => {
                 <Shield className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent flex items-center gap-2">
                   Guardian Dashboard
+                  <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-700 dark:text-blue-300 ml-2">
+                    <Eye className="h-3 w-3 mr-1" />
+                    View Only
+                  </Badge>
                 </h1>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <Eye className="h-4 w-4" />
@@ -854,16 +950,32 @@ const GuardianDashboard = () => {
           </Card>
         </div>
 
-        <Separator className="my-8" />
+        {/* Tabs for Organized Sections */}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList
+            className="grid w-full grid-cols-5 max-w-2xl"
+          >
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="students">Students</TabsTrigger>
+            <TabsTrigger value="assessments">Assessments</TabsTrigger>
+            <TabsTrigger value="library">Library</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
 
-        {/* Enhanced Student Progress Cards */}
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6 mt-6">
+            {/* Enhanced Student Progress Cards */}
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-xl font-bold flex items-center gap-2">
                   <Target className="h-5 w-5 text-primary" />
                   Student Progress Overview
+                  <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Read-Only
+                  </Badge>
                 </CardTitle>
                 <CardDescription>Detailed insights into each student's learning journey</CardDescription>
               </div>
@@ -984,28 +1096,37 @@ const GuardianDashboard = () => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-6">
-                            <div className="text-center">
-                              <div className="h-12 w-12 mx-auto rounded-xl bg-blue-500/10 flex items-center justify-center mb-2">
-                                <BookOpen className="h-6 w-6 text-blue-500" />
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="text-center p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                              <div className="h-10 w-10 mx-auto rounded-lg bg-blue-500/20 flex items-center justify-center mb-2">
+                                <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                               </div>
-                              <p className="text-2xl font-bold">{student.enrolledCourses}</p>
-                              <p className="text-xs text-muted-foreground">Enrolled</p>
+                              <p className="text-2xl font-bold text-foreground">{student.enrolledCourses}</p>
+                              <p className="text-xs text-muted-foreground font-medium">Enrolled Courses</p>
                             </div>
-                            <div className="text-center">
-                              <div className="h-12 w-12 mx-auto rounded-xl bg-green-500/10 flex items-center justify-center mb-2">
-                                <CheckCircle2 className="h-6 w-6 text-green-500" />
+                            <div className="text-center p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                              <div className="h-10 w-10 mx-auto rounded-lg bg-green-500/20 flex items-center justify-center mb-2">
+                                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
                               </div>
-                              <p className="text-2xl font-bold">{student.completedCourses}</p>
-                              <p className="text-xs text-muted-foreground">Completed</p>
+                              <p className="text-2xl font-bold text-foreground">{student.completedCourses}</p>
+                              <p className="text-xs text-muted-foreground font-medium">Completed</p>
                             </div>
-                            <div className="text-center">
-                              <div className="h-12 w-12 mx-auto rounded-xl bg-yellow-500/10 flex items-center justify-center mb-2">
-                                <Trophy className="h-6 w-6 text-yellow-500" />
+                            <div className="text-center p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                              <div className="h-10 w-10 mx-auto rounded-lg bg-yellow-500/20 flex items-center justify-center mb-2">
+                                <Trophy className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                               </div>
-                              <p className="text-2xl font-bold">{student.certificates}</p>
-                              <p className="text-xs text-muted-foreground">Certificates</p>
+                              <p className="text-2xl font-bold text-foreground">{student.certificates}</p>
+                              <p className="text-xs text-muted-foreground font-medium">Certificates</p>
                             </div>
+                            {student.averageScore !== undefined && (
+                              <div className="text-center p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                                <div className="h-10 w-10 mx-auto rounded-lg bg-purple-500/20 flex items-center justify-center mb-2">
+                                  <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">{student.averageScore}%</p>
+                                <p className="text-xs text-muted-foreground font-medium">Avg Score</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1119,10 +1240,13 @@ const GuardianDashboard = () => {
                             onOpenChange={(open) => setSelectedStudentId(open ? student.studentId : null)}
                           >
                             <CollapsibleTrigger asChild>
-                              <Button variant="outline" className="w-full justify-between">
+                              <Button variant="outline" className="w-full justify-between" disabled={false}>
                                 <span className="flex items-center gap-2">
                                   <Eye className="h-4 w-4" />
                                   View Detailed Information
+                                  <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                    Read-Only
+                                  </Badge>
                                 </span>
                                 {selectedStudentId === student.studentId ? (
                                   <ChevronUp className="h-4 w-4" />
@@ -1138,56 +1262,125 @@ const GuardianDashboard = () => {
                                   <CardTitle className="text-lg flex items-center gap-2">
                                     <BookOpen className="h-5 w-5" />
                                     Enrolled Courses
+                                    <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                   {studentCourses[student.studentId] && studentCourses[student.studentId].length > 0 ? (
                                     <div className="space-y-3">
-                                      {studentCourses[student.studentId].map((course) => (
-                                        <div key={course.courseId} className="p-4 border rounded-lg space-y-3 hover:bg-muted/50 transition-colors">
-                                          <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                              <p className="font-semibold text-lg">{course.courseTitle}</p>
-                                              {course.courseDescription && (
-                                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                                  {course.courseDescription}
-                                                </p>
-                                              )}
-                                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                                <span>Enrolled: {new Date(course.enrolledAt).toLocaleDateString()}</span>
-                                                {course.completedAt && (
-                                                  <span className="text-green-600">
-                                                    Completed: {new Date(course.completedAt).toLocaleDateString()}
-                                                  </span>
-                                                )}
-                                              </div>
-                                              {course.teacherName && (
-                                                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded-md">
-                                                  <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Course Teacher:</p>
-                                                  <div className="flex items-center gap-2 text-sm">
-                                                    <Users className="h-3 w-3" />
-                                                    <span className="font-medium">{course.teacherName}</span>
-                                              {course.teacherPhone && (
-                                                <span className="text-muted-foreground">• {course.teacherPhone}</span>
-                                              )}
+                                      {studentCourses[student.studentId].map((course) => {
+                                        const isCompleted = course.completedAt !== null;
+                                        const progressColor = course.progress >= 80 ? 'text-green-600 dark:text-green-400' : 
+                                                             course.progress >= 50 ? 'text-blue-600 dark:text-blue-400' : 
+                                                             'text-orange-600 dark:text-orange-400';
+                                        return (
+                                          <div key={course.courseId} className="group p-5 border-2 rounded-xl space-y-4 hover:shadow-lg hover:border-primary/30 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm">
+                                            <div className="flex items-start justify-between gap-4">
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-start gap-3 mb-2">
+                                                  <div className={`h-12 w-12 rounded-lg flex items-center justify-center shrink-0 ${
+                                                    isCompleted ? 'bg-green-500/10' : 'bg-blue-500/10'
+                                                  }`}>
+                                                    <BookOpen className={`h-6 w-6 ${
+                                                      isCompleted ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'
+                                                    }`} />
+                                                  </div>
+                                                  <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-lg text-foreground mb-1 group-hover:text-primary transition-colors">
+                                                      {course.courseTitle}
+                                                    </h4>
+                                                    {course.courseDescription && (
+                                                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                                                        {course.courseDescription}
+                                                      </p>
+                                                    )}
                                                   </div>
                                                 </div>
-                                              )}
-                                            </div>
-                                            <div className="ml-4 text-right">
-                                              {course.completedAt ? (
-                                                <Badge className="bg-green-500">Completed</Badge>
-                                              ) : (
-                                                <Badge variant="outline">In Progress</Badge>
-                                              )}
-                                              <div className="mt-2">
-                                                <div className="text-sm font-semibold">{course.progress}%</div>
-                                                <Progress value={course.progress} className="w-20 h-2 mt-1" />
+                                                
+                                                {/* Progress Bar */}
+                                                <div className="mb-3">
+                                                  <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-xs font-medium text-muted-foreground">Progress</span>
+                                                    <span className={`text-sm font-bold ${progressColor}`}>
+                                                      {course.progress}%
+                                                    </span>
+                                                  </div>
+                                                  <Progress 
+                                                    value={course.progress} 
+                                                    className="h-2.5"
+                                                    style={{
+                                                      background: 'hsl(var(--muted))'
+                                                    }}
+                                                  />
+                                                </div>
+
+                                                {/* Course Info */}
+                                                <div className="grid grid-cols-2 gap-3 mt-4">
+                                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <Calendar className="h-3.5 w-3.5" />
+                                                    <span className="font-medium">
+                                                      Enrolled: {format(new Date(course.enrolledAt), 'MMM dd, yyyy')}
+                                                    </span>
+                                                  </div>
+                                                  {course.completedAt && (
+                                                    <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                                      <span className="font-medium">
+                                                        Completed: {format(new Date(course.completedAt), 'MMM dd, yyyy')}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                </div>
+
+                                                {/* Teacher Info */}
+                                                {course.teacherName && (
+                                                  <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                                                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                                                      <Users className="h-3.5 w-3.5" />
+                                                      Course Teacher
+                                                    </p>
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                      <span className="font-medium text-blue-800 dark:text-blue-200">{course.teacherName}</span>
+                                                      {course.teacherEmail && (
+                                                        <a 
+                                                          href={`mailto:${course.teacherEmail}`}
+                                                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                                          onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                          <Mail className="h-3 w-3" />
+                                                          Contact
+                                                        </a>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                              
+                                              {/* Status Badge */}
+                                              <div className="flex flex-col items-end gap-2 shrink-0">
+                                                {isCompleted ? (
+                                                  <Badge className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5">
+                                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                                    Completed
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="border-blue-500/50 text-blue-700 dark:text-blue-300 px-3 py-1.5">
+                                                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                                    In Progress
+                                                  </Badge>
+                                                )}
+                                                <Badge variant="outline" className="text-xs border-muted-foreground/20 text-muted-foreground">
+                                                  <Eye className="h-3 w-3 mr-1" />
+                                                  View Only
+                                                </Badge>
                                               </div>
                                             </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   ) : (
                                     <p className="text-sm text-muted-foreground">No courses enrolled</p>
@@ -1206,45 +1399,88 @@ const GuardianDashboard = () => {
                                         {student.assignmentsCompleted || 0} / {student.assignments || 0} Completed
                                       </Badge>
                                     )}
+                                    <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                   {studentAssignments[student.studentId] && studentAssignments[student.studentId].length > 0 ? (
                                     <div className="space-y-3">
-                                      {studentAssignments[student.studentId].map((assignment) => (
-                                        <div key={assignment.assignmentId} className="p-3 border rounded-lg">
-                                          <div className="flex items-start justify-between mb-2">
-                                            <div className="flex-1">
-                                              <p className="font-medium">{assignment.assignmentTitle}</p>
-                                              <p className="text-sm text-muted-foreground">{assignment.courseTitle}</p>
+                                      {studentAssignments[student.studentId].map((assignment) => {
+                                        const percentage = assignment.maxScore > 0 
+                                          ? Math.round((assignment.score || 0) / assignment.maxScore * 100) 
+                                          : 0;
+                                        const scoreColor = percentage >= 70 ? 'text-green-600 dark:text-green-400' : 
+                                                          percentage >= 50 ? 'text-orange-600 dark:text-orange-400' : 
+                                                          'text-red-600 dark:text-red-400';
+                                        const badgeColor = percentage >= 70 ? 'bg-green-500 hover:bg-green-600' : 
+                                                          percentage >= 50 ? 'bg-orange-500 hover:bg-orange-600' : 
+                                                          'bg-red-500 hover:bg-red-600';
+                                        return (
+                                          <div key={assignment.assignmentId} className="group p-4 border-2 rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30">
+                                            <div className="flex items-start justify-between gap-4 mb-3">
+                                              <div className="flex-1 min-w-0">
+                                                <h4 className="font-semibold text-base text-foreground mb-1 group-hover:text-primary transition-colors">
+                                                  {assignment.assignmentTitle}
+                                                </h4>
+                                                <p className="text-sm text-muted-foreground mb-2">{assignment.courseTitle}</p>
+                                              </div>
+                                              {assignment.score !== null ? (
+                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                  <Badge className={`${badgeColor} text-white px-3 py-1.5`}>
+                                                    {assignment.score} / {assignment.maxScore}
+                                                  </Badge>
+                                                  <span className={`text-xs font-bold ${scoreColor}`}>
+                                                    {percentage}%
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <Badge variant="outline" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-300">
+                                                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                                  Pending
+                                                </Badge>
+                                              )}
                                             </div>
-                                            {assignment.score !== null ? (
-                                              <Badge className={assignment.score >= (assignment.maxScore * 0.7) ? 'bg-green-500' : 'bg-orange-500'}>
-                                                {assignment.score} / {assignment.maxScore}
-                                              </Badge>
-                                            ) : (
-                                              <Badge variant="outline">Pending</Badge>
-                                            )}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground space-y-1">
-                                            {assignment.dueDate && (
-                                              <p>Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
-                                            )}
-                                            {assignment.submittedAt && (
-                                              <p>Submitted: {new Date(assignment.submittedAt).toLocaleDateString()}</p>
-                                            )}
-                                            {assignment.gradedAt && (
-                                              <p className="text-green-600">Graded: {new Date(assignment.gradedAt).toLocaleDateString()}</p>
-                                            )}
+                                            <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground mb-3">
+                                              {assignment.dueDate && (
+                                                <div className="flex items-center gap-1.5">
+                                                  <Calendar className="h-3.5 w-3.5" />
+                                                  <span>Due: {format(new Date(assignment.dueDate), 'MMM dd, yyyy')}</span>
+                                                </div>
+                                              )}
+                                              {assignment.submittedAt && (
+                                                <div className="flex items-center gap-1.5">
+                                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                                                  <span>Submitted: {format(new Date(assignment.submittedAt), 'MMM dd, yyyy')}</span>
+                                                </div>
+                                              )}
+                                              {assignment.gradedAt && (
+                                                <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                                                  <Award className="h-3.5 w-3.5" />
+                                                  <span>Graded: {format(new Date(assignment.gradedAt), 'MMM dd, yyyy')}</span>
+                                                </div>
+                                              )}
+                                            </div>
                                             {assignment.feedback && (
-                                              <p className="mt-2 p-2 bg-muted rounded">Feedback: {assignment.feedback}</p>
+                                              <div className="mt-3 pt-3 border-t border-border/50">
+                                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Teacher Feedback:</p>
+                                                <p className="text-sm text-foreground/80 bg-muted/50 p-3 rounded-lg italic border-l-2 border-primary/30">
+                                                  "{assignment.feedback}"
+                                                </p>
+                                              </div>
                                             )}
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   ) : (
-                                    <p className="text-sm text-muted-foreground">No assignments submitted</p>
+                                    <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+                                      <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                                      <p className="text-sm font-medium text-muted-foreground">No assignments submitted</p>
+                                      <p className="text-xs text-muted-foreground mt-1">Assignments will appear here once submitted</p>
+                                    </div>
                                   )}
                                 </CardContent>
                               </Card>
@@ -1260,38 +1496,304 @@ const GuardianDashboard = () => {
                                         {student.quizzesPassed || 0} / {student.quizzes || 0} Passed
                                       </Badge>
                                     )}
+                                    <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                   {studentQuizzes[student.studentId] && studentQuizzes[student.studentId].length > 0 ? (
                                     <div className="space-y-3">
-                                      {studentQuizzes[student.studentId].map((quiz) => (
-                                        <div key={quiz.quizId} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                          <div className="flex items-start justify-between mb-2">
-                                            <div className="flex-1">
-                                              <p className="font-medium">{quiz.quizTitle}</p>
-                                              <p className="text-sm text-muted-foreground">{quiz.courseTitle}</p>
+                                      {studentQuizzes[student.studentId].map((quiz) => {
+                                        const passedColor = quiz.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                                        const badgeColor = quiz.passed ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600';
+                                        return (
+                                          <div key={quiz.quizId} className="group p-4 border-2 rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30">
+                                            <div className="flex items-start justify-between gap-4 mb-3">
+                                              <div className="flex-1 min-w-0">
+                                                <h4 className="font-semibold text-base text-foreground mb-1 group-hover:text-primary transition-colors">
+                                                  {quiz.quizTitle}
+                                                </h4>
+                                                <p className="text-sm text-muted-foreground mb-2">{quiz.courseTitle}</p>
+                                              </div>
+                                              {quiz.score !== null ? (
+                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                  <Badge className={`${badgeColor} text-white px-3 py-1.5`}>
+                                                    {quiz.score}% {quiz.passed ? '✓' : '✗'}
+                                                  </Badge>
+                                                  <span className={`text-xs font-bold ${passedColor}`}>
+                                                    {quiz.passed ? 'Passed' : 'Failed'}
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <Badge variant="outline" className="border-gray-500/50 text-gray-700 dark:text-gray-300">
+                                                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                                  Not Taken
+                                                </Badge>
+                                              )}
                                             </div>
-                                            {quiz.score !== null ? (
-                                              <Badge className={quiz.passed ? 'bg-green-500' : 'bg-red-500'}>
-                                                {quiz.score}% {quiz.passed ? '✓' : '✗'}
-                                              </Badge>
-                                            ) : (
-                                              <Badge variant="outline">Not Taken</Badge>
-                                            )}
+                                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                              <div className="flex items-center gap-1.5">
+                                                <Target className="h-3.5 w-3.5" />
+                                                <span>Passing: {quiz.passingScore}%</span>
+                                              </div>
+                                              {quiz.submittedAt && (
+                                                <div className="flex items-center gap-1.5">
+                                                  <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
+                                                  <span>Submitted: {format(new Date(quiz.submittedAt), 'MMM dd, yyyy')}</span>
+                                                </div>
+                                              )}
+                                            </div>
                                           </div>
-                                          <div className="text-xs text-muted-foreground">
-                                            <p>Passing Score: {quiz.passingScore}%</p>
-                                            {quiz.submittedAt && (
-                                              <p>Submitted: {new Date(quiz.submittedAt).toLocaleDateString()}</p>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   ) : (
-                                    <p className="text-sm text-muted-foreground">No quizzes taken</p>
+                                    <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+                                      <GraduationCap className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                                      <p className="text-sm font-medium text-muted-foreground">No quizzes taken</p>
+                                      <p className="text-xs text-muted-foreground mt-1">Quiz results will appear here once completed</p>
+                                    </div>
                                   )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Attendance Section */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <Calendar className="h-5 w-5" />
+                                    Attendance Records
+                                    <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
+                                  </CardTitle>
+                                  <CardDescription>Recent attendance for {student.studentName} (Read-Only)</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                  {studentAttendance[student.studentId] && studentAttendance[student.studentId].length > 0 ? (
+                                    <div className="space-y-3">
+                                      {/* Attendance Summary */}
+                                      <div className="grid grid-cols-4 gap-2 mb-4 p-3 bg-muted/30 rounded-lg">
+                                        {['present', 'absent', 'late', 'excused'].map((status) => {
+                                          const count = studentAttendance[student.studentId].filter(r => r.status === status).length;
+                                          const colors = {
+                                            present: { bg: 'bg-green-500/10', text: 'text-green-600 dark:text-green-400', icon: CheckCircle2 },
+                                            absent: { bg: 'bg-red-500/10', text: 'text-red-600 dark:text-red-400', icon: XCircle },
+                                            late: { bg: 'bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400', icon: Clock },
+                                            excused: { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', icon: UserCheck }
+                                          };
+                                          const { bg, text, icon: Icon } = colors[status as keyof typeof colors];
+                                          return (
+                                            <div key={status} className={`${bg} rounded-lg p-2 text-center`}>
+                                              <Icon className={`h-4 w-4 mx-auto mb-1 ${text}`} />
+                                              <p className={`text-lg font-bold ${text}`}>{count}</p>
+                                              <p className="text-xs text-muted-foreground capitalize">{status}</p>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      {studentAttendance[student.studentId].slice(0, 10).map((record) => {
+                                        const statusColors = {
+                                          present: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-600 dark:text-green-400', badge: 'bg-green-500 hover:bg-green-600' },
+                                          absent: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-600 dark:text-red-400', badge: 'bg-red-500 hover:bg-red-600' },
+                                          late: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-600 dark:text-yellow-400', badge: 'bg-yellow-500 hover:bg-yellow-600' },
+                                          excused: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-600 dark:text-blue-400', badge: 'bg-blue-500 hover:bg-blue-600' }
+                                        };
+                                        const colors = statusColors[record.status];
+                                        return (
+                                          <div 
+                                            key={record.id} 
+                                            className={`flex items-center justify-between p-4 rounded-xl ${colors.bg} ${colors.border} border-2 hover:shadow-md transition-all duration-300`}
+                                          >
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <Calendar className={`h-4 w-4 ${colors.text}`} />
+                                                <p className="font-semibold text-sm text-foreground">
+                                                  {record.sessionTitle || 'Class Session'}
+                                                </p>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mb-1">
+                                                {record.courseTitle}
+                                              </p>
+                                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                <span className="flex items-center gap-1">
+                                                  <Calendar className="h-3 w-3" />
+                                                  {format(new Date(record.sessionDate), 'MMM dd, yyyy')}
+                                                </span>
+                                                {record.sessionTime && (
+                                                  <span className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    {record.sessionTime}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {record.notes && (
+                                                <div className="mt-2 pt-2 border-t border-border/30">
+                                                  <p className="text-xs text-muted-foreground italic">
+                                                    <span className="font-medium">Note:</span> {record.notes}
+                                                  </p>
+                                                </div>
+                                              )}
+                                            </div>
+                                            <Badge 
+                                              className={`ml-3 shrink-0 ${colors.badge} text-white px-3 py-1.5`}
+                                            >
+                                              {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                                            </Badge>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+                                      <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                                      <p className="text-sm font-medium text-muted-foreground">No attendance records yet</p>
+                                      <p className="text-xs text-muted-foreground mt-1">Attendance will appear here once sessions are marked</p>
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Grades Summary Section */}
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <Award className="h-5 w-5" />
+                                    Grades Summary
+                                    <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
+                                  </CardTitle>
+                                  <CardDescription>All graded assessments for {student.studentName} (Read-Only)</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="space-y-6">
+                                    {/* Assignments Grades */}
+                                    {studentAssignments[student.studentId] && 
+                                     studentAssignments[student.studentId].filter(a => a.score !== null).length > 0 && (
+                                      <div>
+                                        <h4 className="font-semibold text-base mb-3 flex items-center gap-2">
+                                          <FileText className="h-4 w-4 text-blue-600" />
+                                          Assignments
+                                          <Badge variant="secondary" className="ml-2 text-xs">
+                                            {studentAssignments[student.studentId].filter(a => a.score !== null).length} Graded
+                                          </Badge>
+                                        </h4>
+                                        <div className="space-y-3">
+                                          {studentAssignments[student.studentId]
+                                            .filter(a => a.score !== null)
+                                            .slice(0, 5)
+                                            .map((assignment) => {
+                                              const percentage = assignment.maxScore > 0 
+                                                ? Math.round((assignment.score || 0) / assignment.maxScore * 100) 
+                                                : 0;
+                                              const scoreColor = percentage >= 70 ? 'text-green-600 dark:text-green-400' : 
+                                                                percentage >= 50 ? 'text-orange-600 dark:text-orange-400' : 
+                                                                'text-red-600 dark:text-red-400';
+                                              return (
+                                                <div 
+                                                  key={assignment.assignmentId} 
+                                                  className="group p-4 rounded-xl border-2 border-border/50 hover:shadow-md hover:border-primary/20 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30"
+                                                >
+                                                  <div className="flex items-start justify-between gap-4 mb-2">
+                                                    <div className="flex-1 min-w-0">
+                                                      <h5 className="font-semibold text-sm text-foreground mb-1 group-hover:text-primary transition-colors truncate">
+                                                        {assignment.assignmentTitle}
+                                                      </h5>
+                                                      <p className="text-xs text-muted-foreground">{assignment.courseTitle}</p>
+                                                    </div>
+                                                    <div className="ml-3 text-right shrink-0">
+                                                      <p className={`font-bold text-xl ${scoreColor}`}>
+                                                        {assignment.score} / {assignment.maxScore}
+                                                      </p>
+                                                      <p className={`text-sm font-bold ${scoreColor}`}>
+                                                        {percentage}%
+                                                      </p>
+                                                      <Progress value={percentage} className="w-16 h-1.5 mt-1.5" />
+                                                    </div>
+                                                  </div>
+                                                  {assignment.feedback && (
+                                                    <div className="mt-3 pt-3 border-t border-border/30">
+                                                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Teacher Feedback:</p>
+                                                      <p className="text-xs text-foreground/80 bg-muted/50 p-2.5 rounded-lg italic border-l-2 border-primary/30">
+                                                        "{assignment.feedback}"
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Quizzes Grades */}
+                                    {studentQuizzes[student.studentId] && 
+                                     studentQuizzes[student.studentId].filter(q => q.score !== null).length > 0 && (
+                                      <div>
+                                        <h4 className="font-semibold text-base mb-3 flex items-center gap-2">
+                                          <GraduationCap className="h-4 w-4 text-purple-600" />
+                                          Quizzes & Tests
+                                          <Badge variant="secondary" className="ml-2 text-xs">
+                                            {studentQuizzes[student.studentId].filter(q => q.score !== null).length} Completed
+                                          </Badge>
+                                        </h4>
+                                        <div className="space-y-3">
+                                          {studentQuizzes[student.studentId]
+                                            .filter(q => q.score !== null)
+                                            .slice(0, 5)
+                                            .map((quiz) => {
+                                              const passedColor = quiz.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                                              const badgeColor = quiz.passed ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600';
+                                              return (
+                                                <div 
+                                                  key={quiz.quizId} 
+                                                  className="group p-4 rounded-xl border-2 border-border/50 hover:shadow-md hover:border-primary/20 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30"
+                                                >
+                                                  <div className="flex items-start justify-between gap-4">
+                                                    <div className="flex-1 min-w-0">
+                                                      <h5 className="font-semibold text-sm text-foreground mb-1 group-hover:text-primary transition-colors truncate">
+                                                        {quiz.quizTitle}
+                                                      </h5>
+                                                      <p className="text-xs text-muted-foreground mb-2">{quiz.courseTitle}</p>
+                                                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                        <span className="flex items-center gap-1">
+                                                          <Target className="h-3.5 w-3.5" />
+                                                          Passing: {quiz.passingScore}%
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                    <div className="ml-3 text-right shrink-0">
+                                                      <Badge className={`${badgeColor} text-white px-3 py-1.5 mb-1`}>
+                                                        {quiz.score}% {quiz.passed ? '✓' : '✗'}
+                                                      </Badge>
+                                                      <p className={`text-xs font-bold ${passedColor}`}>
+                                                        {quiz.passed ? 'Passed' : 'Failed'}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {(!studentAssignments[student.studentId] || 
+                                      studentAssignments[student.studentId].filter(a => a.score !== null).length === 0) &&
+                                     (!studentQuizzes[student.studentId] || 
+                                      studentQuizzes[student.studentId].filter(q => q.score !== null).length === 0) && (
+                                      <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+                                        <Award className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                                        <p className="text-sm font-medium text-muted-foreground">No grades available yet</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Grades will appear here once assessments are graded</p>
+                                      </div>
+                                    )}
+                                  </div>
                                 </CardContent>
                               </Card>
 
@@ -1306,45 +1808,88 @@ const GuardianDashboard = () => {
                                         {studentExams[student.studentId].length} Exam{studentExams[student.studentId].length !== 1 ? 's' : ''}
                                       </Badge>
                                     )}
+                                    <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                   {studentExams[student.studentId] && studentExams[student.studentId].length > 0 ? (
                                     <div className="space-y-3">
-                                      {studentExams[student.studentId].map((exam) => (
-                                        <div key={exam.examId} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                          <div className="flex items-start justify-between mb-2">
-                                            <div className="flex-1">
-                                              <p className="font-medium">{exam.examTitle}</p>
-                                              <p className="text-sm text-muted-foreground">{exam.courseTitle}</p>
+                                      {studentExams[student.studentId].map((exam) => {
+                                        const percentage = exam.maxScore > 0 
+                                          ? Math.round((exam.score || 0) / exam.maxScore * 100) 
+                                          : 0;
+                                        const scoreColor = percentage >= 70 ? 'text-green-600 dark:text-green-400' : 
+                                                          percentage >= 50 ? 'text-orange-600 dark:text-orange-400' : 
+                                                          'text-red-600 dark:text-red-400';
+                                        const badgeColor = percentage >= 70 ? 'bg-green-500 hover:bg-green-600' : 
+                                                          percentage >= 50 ? 'bg-orange-500 hover:bg-orange-600' : 
+                                                          'bg-red-500 hover:bg-red-600';
+                                        return (
+                                          <div key={exam.examId} className="group p-4 border-2 rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30">
+                                            <div className="flex items-start justify-between gap-4 mb-3">
+                                              <div className="flex-1 min-w-0">
+                                                <h4 className="font-semibold text-base text-foreground mb-1 group-hover:text-primary transition-colors">
+                                                  {exam.examTitle}
+                                                </h4>
+                                                <p className="text-sm text-muted-foreground mb-2">{exam.courseTitle}</p>
+                                              </div>
+                                              {exam.score !== null ? (
+                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                  <Badge className={`${badgeColor} text-white px-3 py-1.5`}>
+                                                    {exam.score} / {exam.maxScore}
+                                                  </Badge>
+                                                  <span className={`text-xs font-bold ${scoreColor}`}>
+                                                    {percentage}%
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <Badge variant="outline" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-300">
+                                                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                                  Pending
+                                                </Badge>
+                                              )}
                                             </div>
-                                            {exam.score !== null ? (
-                                              <Badge className={exam.score >= (exam.maxScore * 0.7) ? 'bg-green-500' : exam.score >= (exam.maxScore * 0.5) ? 'bg-orange-500' : 'bg-red-500'}>
-                                                {exam.score} / {exam.maxScore}
-                                              </Badge>
-                                            ) : (
-                                              <Badge variant="outline">Pending</Badge>
-                                            )}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground space-y-1">
-                                            {exam.dueDate && (
-                                              <p>Due: {new Date(exam.dueDate).toLocaleDateString()}</p>
-                                            )}
-                                            {exam.submittedAt && (
-                                              <p>Submitted: {new Date(exam.submittedAt).toLocaleDateString()}</p>
-                                            )}
-                                            {exam.gradedAt && (
-                                              <p className="text-green-600">Graded: {new Date(exam.gradedAt).toLocaleDateString()}</p>
-                                            )}
+                                            <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground mb-3">
+                                              {exam.dueDate && (
+                                                <div className="flex items-center gap-1.5">
+                                                  <Calendar className="h-3.5 w-3.5" />
+                                                  <span>Due: {format(new Date(exam.dueDate), 'MMM dd, yyyy')}</span>
+                                                </div>
+                                              )}
+                                              {exam.submittedAt && (
+                                                <div className="flex items-center gap-1.5">
+                                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                                                  <span>Submitted: {format(new Date(exam.submittedAt), 'MMM dd, yyyy')}</span>
+                                                </div>
+                                              )}
+                                              {exam.gradedAt && (
+                                                <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                                                  <Award className="h-3.5 w-3.5" />
+                                                  <span>Graded: {format(new Date(exam.gradedAt), 'MMM dd, yyyy')}</span>
+                                                </div>
+                                              )}
+                                            </div>
                                             {exam.feedback && (
-                                              <p className="mt-2 p-2 bg-muted rounded">Feedback: {exam.feedback}</p>
+                                              <div className="mt-3 pt-3 border-t border-border/50">
+                                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Teacher Feedback:</p>
+                                                <p className="text-sm text-foreground/80 bg-muted/50 p-3 rounded-lg italic border-l-2 border-primary/30">
+                                                  "{exam.feedback}"
+                                                </p>
+                                              </div>
                                             )}
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   ) : (
-                                    <p className="text-sm text-muted-foreground">No exams taken</p>
+                                    <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+                                      <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                                      <p className="text-sm font-medium text-muted-foreground">No exams taken</p>
+                                      <p className="text-xs text-muted-foreground mt-1">Exam results will appear here once completed</p>
+                                    </div>
                                   )}
                                 </CardContent>
                               </Card>
@@ -1360,62 +1905,114 @@ const GuardianDashboard = () => {
                                         {studentLibraryItems[student.studentId].length} Items
                                       </Badge>
                                     )}
+                                    <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View Only
+                                    </Badge>
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                   {studentLibraryItems[student.studentId] && studentLibraryItems[student.studentId].length > 0 ? (
                                     <div className="space-y-3">
-                                      {studentLibraryItems[student.studentId].map((item) => (
-                                        <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                          <div className="flex items-center gap-3">
-                                            {item.type === 'book' ? (
-                                              <Book className="h-5 w-5 text-blue-500" />
-                                            ) : (
-                                              <Video className="h-5 w-5 text-purple-500" />
-                                            )}
-                                            <div>
-                                              <p className="font-medium">{item.title}</p>
-                                              <p className="text-xs text-muted-foreground">
-                                                {item.type === 'book' ? 'Book' : 'Video'}
-                                                {item.accessedAt && (
-                                                  <span className="ml-2">
-                                                    • Last accessed: {new Date(item.accessedAt).toLocaleDateString()}
-                                                  </span>
+                                      {studentLibraryItems[student.studentId].map((item) => {
+                                        const isBook = item.type === 'book';
+                                        return (
+                                          <div key={item.id} className="group flex items-center justify-between p-4 border-2 rounded-xl hover:shadow-md hover:border-primary/20 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                              <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${
+                                                isBook ? 'bg-blue-500/10' : 'bg-purple-500/10'
+                                              }`}>
+                                                {isBook ? (
+                                                  <Book className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                ) : (
+                                                  <Video className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                                                 )}
-                                              </p>
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-sm text-foreground truncate">{item.title}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {isBook ? 'Book' : 'Video'}
+                                                  </Badge>
+                                                  {item.accessedAt && (
+                                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                      <Clock className="h-3 w-3" />
+                                                      {format(new Date(item.accessedAt), 'MMM dd, yyyy')}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
                                             </div>
+                                            {item.progress !== undefined && item.progress > 0 && (
+                                              <div className="text-right shrink-0 ml-4">
+                                                <div className={`text-sm font-bold ${
+                                                  item.progress >= 80 ? 'text-green-600 dark:text-green-400' :
+                                                  item.progress >= 50 ? 'text-blue-600 dark:text-blue-400' :
+                                                  'text-orange-600 dark:text-orange-400'
+                                                }`}>
+                                                  {item.progress}%
+                                                </div>
+                                                <Progress value={item.progress} className="w-20 h-2 mt-1" />
+                                              </div>
+                                            )}
                                           </div>
-                                          {item.progress !== undefined && (
-                                            <div className="text-right">
-                                              <div className="text-sm font-semibold">{item.progress}%</div>
-                                              <Progress value={item.progress} className="w-20 h-2 mt-1" />
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   ) : (
-                                    <p className="text-sm text-muted-foreground">No library items accessed yet</p>
+                                    <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+                                      <Library className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                                      <p className="text-sm font-medium text-muted-foreground">No library items accessed yet</p>
+                                      <p className="text-xs text-muted-foreground mt-1">Library access will appear here once student accesses resources</p>
+                                    </div>
                                   )}
                                 </CardContent>
                               </Card>
 
                               {/* Average Score */}
                               {student.averageScore !== undefined && (
-                                <Card>
+                                <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
                                   <CardHeader>
                                     <CardTitle className="text-lg flex items-center gap-2">
-                                      <BarChart3 className="h-5 w-5" />
+                                      <BarChart3 className="h-5 w-5 text-primary" />
                                       Overall Performance
+                                      <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                                        <Eye className="h-3 w-3 mr-1" />
+                                        View Only
+                                      </Badge>
                                     </CardTitle>
                                   </CardHeader>
                                   <CardContent>
-                                    <div className="text-center">
-                                      <div className="text-4xl font-bold text-primary mb-2">
+                                    <div className="text-center py-4">
+                                      <div className={`text-5xl font-black mb-2 ${
+                                        student.averageScore >= 80 ? 'text-green-600 dark:text-green-400' :
+                                        student.averageScore >= 60 ? 'text-blue-600 dark:text-blue-400' :
+                                        'text-orange-600 dark:text-orange-400'
+                                      }`}>
                                         {student.averageScore}%
                                       </div>
-                                      <p className="text-sm text-muted-foreground">Average Score</p>
-                                      <Progress value={student.averageScore} className="mt-4" />
+                                      <p className="text-sm font-medium text-muted-foreground mb-4">Average Score Across All Assessments</p>
+                                      <Progress 
+                                        value={student.averageScore} 
+                                        className="h-3 mt-2"
+                                        style={{
+                                          background: 'hsl(var(--muted))'
+                                        }}
+                                      />
+                                      <div className="flex items-center justify-center gap-4 mt-4 text-xs">
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                          <span className="text-muted-foreground">Excellent (80%+)</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                          <span className="text-muted-foreground">Good (60-79%)</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                                          <span className="text-muted-foreground">Needs Improvement (&lt;60%)</span>
+                                        </div>
+                                      </div>
                                     </div>
                                   </CardContent>
                                 </Card>
@@ -1431,6 +2028,321 @@ const GuardianDashboard = () => {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          {/* Students Tab */}
+          <TabsContent value="students" className="space-y-6 mt-6">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  All Students
+                  <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Read-Only
+                  </Badge>
+                </CardTitle>
+                <CardDescription>Comprehensive read-only view of all students under your care</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {students.length === 0 ? (
+                  <div className="text-center py-16 bg-muted/20 rounded-xl">
+                    <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-muted/40 flex items-center justify-center">
+                      <Users className="h-10 w-10 text-muted-foreground/50" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No Students Assigned</h3>
+                    <p className="text-muted-foreground mb-2 max-w-md mx-auto">
+                      No students have been assigned to you yet.
+                    </p>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                      Please contact an administrator to link student accounts and start monitoring their progress.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {studentProgress.map((student, index) => {
+                      const completionRate = student.enrolledCourses > 0 
+                        ? (student.completedCourses / student.enrolledCourses) * 100 
+                        : 0;
+
+                      return (
+                        <Card 
+                          key={student.studentId}
+                          className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-border/50"
+                        >
+                          <div className="bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 p-6">
+                            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                              <div className="flex items-center gap-4">
+                                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg text-white text-2xl font-bold">
+                                  {student.studentName.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <h3 className="text-xl font-bold text-foreground">{student.studentName}</h3>
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    <Badge variant="secondary" className="text-xs">
+                                      {students.find(s => s.student_id === student.studentId)?.relationship || 'Student'}
+                                    </Badge>
+                                    {completionRate > 70 && (
+                                      <Badge className="text-xs bg-green-500 hover:bg-green-600">
+                                        <Star className="h-3 w-3 mr-1" />
+                                        Excellent
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="text-center p-4 rounded-xl bg-blue-500/10 border-2 border-blue-500/20 hover:shadow-md transition-all">
+                              <div className="h-10 w-10 mx-auto rounded-lg bg-blue-500/20 flex items-center justify-center mb-2">
+                                <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <p className="text-2xl font-bold text-foreground">{student.enrolledCourses}</p>
+                              <p className="text-xs text-muted-foreground font-medium mt-1">Enrolled Courses</p>
+                            </div>
+                            <div className="text-center p-4 rounded-xl bg-green-500/10 border-2 border-green-500/20 hover:shadow-md transition-all">
+                              <div className="h-10 w-10 mx-auto rounded-lg bg-green-500/20 flex items-center justify-center mb-2">
+                                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                              </div>
+                              <p className="text-2xl font-bold text-foreground">{student.completedCourses}</p>
+                              <p className="text-xs text-muted-foreground font-medium mt-1">Completed</p>
+                            </div>
+                            <div className="text-center p-4 rounded-xl bg-yellow-500/10 border-2 border-yellow-500/20 hover:shadow-md transition-all">
+                              <div className="h-10 w-10 mx-auto rounded-lg bg-yellow-500/20 flex items-center justify-center mb-2">
+                                <Trophy className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                              </div>
+                              <p className="text-2xl font-bold text-foreground">{student.certificates}</p>
+                              <p className="text-xs text-muted-foreground font-medium mt-1">Certificates</p>
+                            </div>
+                            {student.averageScore !== undefined && (
+                              <div className="text-center p-4 rounded-xl bg-purple-500/10 border-2 border-purple-500/20 hover:shadow-md transition-all">
+                                <div className="h-10 w-10 mx-auto rounded-lg bg-purple-500/20 flex items-center justify-center mb-2">
+                                  <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">{student.averageScore}%</p>
+                                <p className="text-xs text-muted-foreground font-medium mt-1">Avg Score</p>
+                              </div>
+                            )}
+                          </div>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Assessments Tab */}
+          <TabsContent value="assessments" className="space-y-6 mt-6">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Student Assessments
+                  <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Read-Only
+                  </Badge>
+                </CardTitle>
+                <CardDescription>View all assignments, quizzes, and exams for your students (Read-Only)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {studentProgress.map((student) => (
+                    <div key={student.studentId} className="space-y-4">
+                      <h3 className="font-semibold text-lg">{student.studentName}</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {studentAssignments[student.studentId] && studentAssignments[student.studentId].length > 0 && (
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-base">Assignments</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                {studentAssignments[student.studentId].slice(0, 3).map((assignment) => (
+                                  <div key={assignment.assignmentId} className="p-2 border rounded text-sm">
+                                    <p className="font-medium">{assignment.assignmentTitle}</p>
+                                    {assignment.score !== null && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Score: {assignment.score} / {assignment.maxScore}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                        {studentQuizzes[student.studentId] && studentQuizzes[student.studentId].length > 0 && (
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-base">Quizzes</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                {studentQuizzes[student.studentId].slice(0, 3).map((quiz) => (
+                                  <div key={quiz.quizId} className="p-2 border rounded text-sm">
+                                    <p className="font-medium">{quiz.quizTitle}</p>
+                                    {quiz.score !== null && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Score: {quiz.score}% {quiz.passed ? '✓' : '✗'}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Library Tab */}
+          <TabsContent value="library" className="space-y-6 mt-6">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <Library className="h-5 w-5 text-primary" />
+                  Library Access
+                  <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Read-Only
+                  </Badge>
+                </CardTitle>
+                <CardDescription>Books and videos accessed by your students (Read-Only)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {studentProgress.map((student) => (
+                    <div key={student.studentId} className="space-y-4">
+                      <h3 className="font-semibold text-lg">{student.studentName}</h3>
+                      {studentLibraryItems[student.studentId] && studentLibraryItems[student.studentId].length > 0 ? (
+                        <div className="grid md:grid-cols-2 gap-4">
+                          {studentLibraryItems[student.studentId].map((item) => (
+                            <Card key={item.id}>
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                  {item.type === 'book' ? (
+                                    <Book className="h-5 w-5 text-blue-500" />
+                                  ) : (
+                                    <Video className="h-5 w-5 text-purple-500" />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="font-medium">{item.title}</p>
+                                    <p className="text-xs text-muted-foreground">{item.type}</p>
+                                  </div>
+                                  {item.progress !== undefined && (
+                                    <div className="text-right">
+                                      <div className="text-sm font-semibold">{item.progress}%</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No library items accessed</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6 mt-6">
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Analytics & Insights
+                  <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground ml-2">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Read-Only
+                  </Badge>
+                </CardTitle>
+                <CardDescription>Performance metrics and learning analytics (Read-Only)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-6">
+                  {studentProgress.map((student) => {
+                    const completionRate = student.enrolledCourses > 0 
+                      ? (student.completedCourses / student.enrolledCourses) * 100 
+                      : 0;
+                    
+                    const chartData = [{
+                      name: 'Completion',
+                      value: Math.round(completionRate),
+                      fill: completionRate > 70 ? '#10b981' : completionRate > 40 ? '#f59e0b' : '#ef4444'
+                    }];
+
+                    return (
+                      <Card key={student.studentId}>
+                        <CardHeader>
+                          <CardTitle className="text-base">{student.studentName}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-6">
+                              <ResponsiveContainer width={100} height={100}>
+                                <RadialBarChart 
+                                  cx="50%" 
+                                  cy="50%" 
+                                  innerRadius="60%" 
+                                  outerRadius="100%" 
+                                  barSize={10}
+                                  data={chartData}
+                                  startAngle={90}
+                                  endAngle={-270}
+                                >
+                                  <RadialBar
+                                    background
+                                    dataKey="value"
+                                    cornerRadius={10}
+                                  />
+                                  <text
+                                    x="50%"
+                                    y="50%"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="fill-foreground text-lg font-bold"
+                                  >
+                                    {Math.round(completionRate)}%
+                                  </text>
+                                </RadialBarChart>
+                              </ResponsiveContainer>
+                              <div className="flex-1 space-y-2">
+                                <div className="text-sm">
+                                  <span className="text-muted-foreground">Progress: </span>
+                                  <span className="font-semibold">{student.completedCourses} / {student.enrolledCourses}</span>
+                                </div>
+                                {student.averageScore !== undefined && (
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">Avg Score: </span>
+                                    <span className="font-semibold">{student.averageScore}%</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

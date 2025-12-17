@@ -88,12 +88,12 @@ export function CourseOverview({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-center p-4 bg-course-detail/50 rounded-lg">
                 <BookOpen className="h-6 w-6 text-primary mx-auto mb-2" />
                 <p className="text-2xl font-bold text-primary">{totalItems}</p>
                 <p className="text-xs text-muted-foreground">Total Lessons</p>
               </div>
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-center p-4 bg-course-detail/50 rounded-lg">
                 <Users className="h-6 w-6 text-primary mx-auto mb-2" />
                 <p className="text-2xl font-bold text-primary">{enrollmentCount}</p>
                 <p className="text-xs text-muted-foreground">Students</p>

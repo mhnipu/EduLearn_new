@@ -188,5 +188,5 @@ This document provides a complete index of all documentation files in the EduLea
 - `tsconfig.json` - TypeScript configuration
 
 ### Scripts
-- `APPLY_ALL_MIGRATIONS_SCRIPT.ps1` - PowerShell migration script
+- `scripts/APPLY_ALL_MIGRATIONS_SCRIPT.ps1` - PowerShell migration script
 - `supabase/scripts/` - SQL scripts folder

@@ -6,7 +6,7 @@ Run this PowerShell script to install Supabase CLI and apply migrations automati
 
 ```powershell
 cd "e:\Work\Personal Projects\EduLearn\EduLearn_new"
-.\INSTALL_AND_APPLY_CLI.ps1
+.\scripts\INSTALL_AND_APPLY_CLI.ps1
 ```
 
 This script will:
@@ -124,4 +124,4 @@ Or verify in Dashboard:
 
 ---
 
-**Need help?** Check `APPLY_ALL_MIGRATIONS.md` for detailed guide.
+**Need help?** Check `docs/migrations/APPLY_ALL_MIGRATIONS.md` for detailed guide.

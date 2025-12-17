@@ -86,3 +86,4 @@ To verify the updates, check any test file:
 grep "BASE_URL" testsprite_tests/TC001_authentication_registration_and_login.py
 # Should show: BASE_URL = "https://pcpiigyuafdzgokiosve.supabase.co"
 ```
+

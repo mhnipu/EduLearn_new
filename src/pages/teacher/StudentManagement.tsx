@@ -290,9 +290,6 @@ const StudentManagement = () => {
 
   const fetchTeacherCourses = async () => {
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:82',message:'fetchTeacherCourses entry',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Fetch courses created by teacher
       const { data: createdCourses } = await supabase
         .from('courses')
@@ -300,9 +297,6 @@ const StudentManagement = () => {
         .eq('created_by', user?.id)
         .order('title');
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:90',message:'createdCourses fetched',data:{count:createdCourses?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Fetch courses assigned to teacher
       const { data: assignedCoursesData, error: assignedError } = await (supabase as any)
         .from('teacher_course_assignments')
@@ -314,10 +308,6 @@ const StudentManagement = () => {
           )
         `)
         .eq('teacher_id', user?.id);
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:102',message:'assignedCoursesData fetched',data:{count:assignedCoursesData?.length||0,error:assignedError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
 
       const assignedCourses = (assignedCoursesData || [])
         .map((ac: any) => ac.courses)
@@ -400,29 +390,16 @@ const StudentManagement = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:141',message:'fetchStudents entry',data:{selectedCourse,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      
       let studentsWithGuardians: any[] = [];
       let viewError: any = null;
 
       if (selectedCourse === 'all') {
         // Fetch all students from all courses
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:410',message:'Fetching all students - view query start',data:{teacherId:user?.id,selectedCourse:'all'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        
         const { data, error } = await (supabase as any)
           .from('teacher_students_with_guardians')
           .select('*')
           .eq('teacher_id', user?.id)
           .order('enrolled_at', { ascending: false });
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:418',message:'View query result for all courses',data:{dataCount:data?.length||0,hasError:!!error,errorMessage:error?.message||null,errorCode:error?.code||null,firstStudent:data?.[0]?.student_id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        
         studentsWithGuardians = data || [];
         viewError = error;
       } else {
@@ -438,22 +415,10 @@ const StudentManagement = () => {
         viewError = error;
       }
       
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:149',message:'view query result',data:{count:studentsWithGuardians?.length||0,hasError:!!viewError,errorMsg:viewError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-
       // If view has error or returns 0 results, try alternative approach for 'all' courses
       if (viewError || !studentsWithGuardians || studentsWithGuardians.length === 0) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:438',message:'View returned empty or error - checking fallback',data:{selectedCourse,hasError:!!viewError,errorMsg:viewError?.message||null,studentsCount:studentsWithGuardians?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
-        
         if (selectedCourse === 'all') {
           // For 'all' courses, try fetching from enrollments directly
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:443',message:'Attempting alternative fetch for all courses',data:{teacherId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-          
           // Get teacher's courses first
           const { data: teacherCourses } = await supabase
             .from('courses')
@@ -474,10 +439,6 @@ const StudentManagement = () => {
             ...assignedCourses.map((c: any) => c.id)
           ];
           
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:460',message:'Teacher courses identified',data:{createdCount:teacherCourses?.length||0,assignedCount:assignedCourses.length,totalCourseIds:allCourseIds.length,courseIds:allCourseIds},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-          
           if (allCourseIds.length > 0) {
             // Fetch enrollments for all teacher's courses (without nested profiles)
             const { data: enrollments, error: enrollError } = await supabase
@@ -490,10 +451,6 @@ const StudentManagement = () => {
               `)
               .in('course_id', allCourseIds)
               .order('enrolled_at', { ascending: false });
-            
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:475',message:'Enrollments fetched for all courses',data:{enrollmentsCount:enrollments?.length||0,hasError:!!enrollError,errorMsg:enrollError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             
             if (enrollments && enrollments.length > 0) {
               // Extract unique user IDs
@@ -533,10 +490,6 @@ const StudentManagement = () => {
                   guardian_relationship: null,
                 };
               });
-              
-              // #region agent log
-              fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:497',message:'Transformed enrollments to students format',data:{transformedCount:studentsWithGuardians.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-              // #endregion
             }
           }
         } else {
@@ -610,17 +563,9 @@ const StudentManagement = () => {
           };
         })
       );
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:508',message:'Setting students state',data:{studentsCount:studentsWithData.length,selectedCourse},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       
       setStudents(studentsWithData);
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/e3b1e8a7-7650-401d-8383-a5f7a7ee6da4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:513',message:'Error in fetchStudents',data:{errorMessage:error instanceof Error ? error.message : String(error),selectedCourse},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-      
       console.error('Error fetching students:', error);
       toast({
         title: 'Error',
@@ -633,10 +578,6 @@ const StudentManagement = () => {
   };
 
   const fetchStudentsManual = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:237',message:'fetchStudentsManual entry',data:{selectedCourse,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    
     // Manual fetch only works for specific courses, not 'all'
     if (selectedCourse === 'all') {
       setStudents([]);
@@ -652,20 +593,12 @@ const StudentManagement = () => {
         .eq('id', selectedCourse)
         .single();
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:245',message:'course fetched',data:{courseTitle:courseData?.title,error:courseError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-
       // Step 2: Get enrollments for this course (without nested relationships)
       const { data: enrollments, error: enrollError } = await supabase
         .from('course_enrollments')
         .select('user_id, enrolled_at, course_id')
         .eq('course_id', selectedCourse)
         .order('enrolled_at', { ascending: false });
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:252',message:'enrollments fetched',data:{count:enrollments?.length||0,error:enrollError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
 
       if (enrollError) {
         console.error('Error fetching enrollments:', enrollError);
@@ -688,10 +621,6 @@ const StudentManagement = () => {
         .eq('teacher_id', user?.id)
         .eq('course_id', selectedCourse);
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:270',message:'teacher assignments check',data:{isAssigned:!!teacherAssignments?.length,error:assignmentError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-
       // If teacher is not assigned to this course, check if they created it
       const isCourseCreator = courseData?.id && courseData?.id === selectedCourse;
       const isAssigned = !!teacherAssignments?.length || isCourseCreator;
@@ -709,10 +638,6 @@ const StudentManagement = () => {
         .from('profiles')
         .select('id, full_name, avatar_url, email, phone, guardian_name, guardian_email, guardian_phone, guardian_address')
         .in('id', studentIds);
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:285',message:'profiles query result',data:{count:profiles?.length||0,error:profileError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
 
       // Step 5: Get guardian relationships
       const { data: guardianRelationships, error: guardianError } = await (supabase as any)
@@ -799,10 +724,6 @@ const StudentManagement = () => {
           };
         })
       );
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentManagement.tsx:350',message:'studentsWithData built',data:{count:studentsWithData.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
 
       setStudents(studentsWithData);
     } catch (error) {

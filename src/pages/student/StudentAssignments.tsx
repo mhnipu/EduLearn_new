@@ -162,9 +162,6 @@ export default function StudentAssignments() {
         if (error) throw error;
         toast({ title: 'Submission updated successfully' });
       } else {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentAssignments.tsx:166',message:'Creating new assignment submission',data:{assignmentId:submittingTo.id,studentId:user!.id,hasText:!!submissionText.trim(),hasAttachment:!!attachmentUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         // Create new submission
         const { error } = await supabase.from('assignment_submissions').insert({
           assignment_id: submittingTo.id,
@@ -172,10 +169,6 @@ export default function StudentAssignments() {
           submission_text: submissionText.trim() || null,
           attachment_url: attachmentUrl,
         });
-
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentAssignments.tsx:173',message:'Submission insert result',data:{error:error?.message||null,code:error?.code||null,statusCode:error?.statusCode||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
 
         if (error) throw error;
         toast({ title: 'Assignment submitted successfully' });
@@ -332,22 +325,22 @@ export default function StudentAssignments() {
         </div>
 
         <Tabs defaultValue="pending" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-course-detail-20 p-1">
-            <TabsTrigger 
-              value="pending" 
-              className="data-[state=active]:bg-course-detail-full data-[state=active]:text-foreground font-semibold transition-all"
-            >
-              <Clock className="h-4 w-4 mr-2" />
-              Pending ({pendingAssignments.length})
-            </TabsTrigger>
-            <TabsTrigger 
-              value="completed"
-              className="data-[state=active]:bg-course-detail-full data-[state=active]:text-foreground font-semibold transition-all"
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Completed ({completedAssignments.length})
-            </TabsTrigger>
-          </TabsList>
+        <TabsList className="grid w-full grid-cols-2 bg-course-detail-20 p-1 rounded-lg">
+          <TabsTrigger 
+            value="pending" 
+            className="text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-semibold transition-all"
+          >
+            <Clock className="h-4 w-4 mr-2" />
+            Pending ({pendingAssignments.length})
+          </TabsTrigger>
+          <TabsTrigger 
+            value="completed"
+            className="text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-semibold transition-all"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Completed ({completedAssignments.length})
+          </TabsTrigger>
+        </TabsList>
 
           <TabsContent value="pending" className="space-y-4 mt-6">
             {pendingAssignments.length === 0 ? (

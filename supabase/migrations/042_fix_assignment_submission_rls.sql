@@ -57,3 +57,4 @@ BEGIN
   RAISE NOTICE '📋 Students can now submit assignments without role checks';
   RAISE NOTICE '🔧 Simplified policy: student_id = auth.uid() is sufficient';
 END $$;
+

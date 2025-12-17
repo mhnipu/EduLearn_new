@@ -256,3 +256,4 @@ The EDulearn platform has been thoroughly tested with **30 automated test cases*
 **Overall Pass Rate**: 13% (4/30)  
 **Critical Issues**: 3  
 **High Priority Issues**: 3
+

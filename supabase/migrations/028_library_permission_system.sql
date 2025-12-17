@@ -40,22 +40,26 @@ ALTER TABLE public.library_role_permissions ENABLE ROW LEVEL SECURITY;
 -- ============================================
 
 -- Admins can manage all permissions
+DROP POLICY IF EXISTS "Admins can manage user library permissions" ON public.library_user_permissions;
 CREATE POLICY "Admins can manage user library permissions"
 ON public.library_user_permissions FOR ALL
 USING (is_admin_or_higher(auth.uid()))
 WITH CHECK (is_admin_or_higher(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can manage role library permissions" ON public.library_role_permissions;
 CREATE POLICY "Admins can manage role library permissions"
 ON public.library_role_permissions FOR ALL
 USING (is_admin_or_higher(auth.uid()))
 WITH CHECK (is_admin_or_higher(auth.uid()));
 
 -- Users can view their own permissions
+DROP POLICY IF EXISTS "Users can view their own library permissions" ON public.library_user_permissions;
 CREATE POLICY "Users can view their own library permissions"
 ON public.library_user_permissions FOR SELECT
 USING (user_id = auth.uid() OR is_admin_or_higher(auth.uid()));
 
 -- Users can view role permissions for their role
+DROP POLICY IF EXISTS "Users can view role library permissions" ON public.library_role_permissions;
 CREATE POLICY "Users can view role library permissions"
 ON public.library_role_permissions FOR SELECT
 USING (
@@ -78,8 +82,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT 
-    -- Admins have full access
+    -- Admins or users with library.read module permission have full access
     is_admin_or_higher(_user_id) OR
+    public.has_module_permission(_user_id, 'library', 'read') OR
     -- User has explicit permission (user-level)
     EXISTS (
       SELECT 1 FROM library_user_permissions
@@ -122,8 +127,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT 
-    -- Admins have full access
+    -- Admins or users with library.read module permission have full access
     is_admin_or_higher(_user_id) OR
+    public.has_module_permission(_user_id, 'library', 'read') OR
     -- User has explicit permission (user-level)
     EXISTS (
       SELECT 1 FROM library_user_permissions

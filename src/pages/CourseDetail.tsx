@@ -130,7 +130,7 @@ export default function CourseDetail() {
 
   const fetchCourseData = async () => {
     setLoading(true);
-    
+
     const { data: courseData, error: courseError } = await supabase
       .from('courses')
       .select('*')

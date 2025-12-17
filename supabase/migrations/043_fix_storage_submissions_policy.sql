@@ -65,3 +65,4 @@ BEGIN
   RAISE NOTICE '📋 Students can now upload files to submissions/ folder';
   RAISE NOTICE '🔧 Path must contain student user ID for security';
 END $$;
+

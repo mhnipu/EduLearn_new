@@ -120,3 +120,4 @@ node "C:\Users\mazed\AppData\Local\npm-cache\_npx\8ddf6bea01b2519d\node_modules\
 - Some tests may need test user accounts created in Supabase
 - RLS policies will be tested automatically when using correct endpoints
 - Storage API tests require proper bucket configuration
+

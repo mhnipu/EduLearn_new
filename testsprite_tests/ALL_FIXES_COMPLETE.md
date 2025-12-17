@@ -202,3 +202,4 @@ grep "SUPABASE_ANON_KEY.*os.getenv" testsprite_tests/TC001_authentication_regist
 ⚠️ **Configuration required** for full test execution
 
 **Ready for re-testing** once environment variables and test users are configured.
+

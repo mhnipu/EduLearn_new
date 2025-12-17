@@ -375,3 +375,4 @@ TestSprite will generate:
 `docs/testing/COMPREHENSIVE_TEST_REPORT.md`
 
 This includes detailed findings from all 9 phases based on static code analysis.
+

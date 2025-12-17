@@ -145,14 +145,20 @@ export function ProtectedRoute({
       // Check role requirements
       if (requiredRole && role !== requiredRole) {
         console.log(`🚫 Role mismatch. Required: ${requiredRole}, Current: ${role}`);
-        navigate('/dashboard', { replace: true });
+        navigate('/dashboard', { 
+          state: { from: location.pathname },
+          replace: true 
+        });
         return;
       }
 
       // Check allowed roles
       if (allowRoles && role && !allowRoles.includes(role)) {
         console.log(`🚫 Role not allowed. Allowed: ${allowRoles.join(', ')}, Current: ${role}`);
-        navigate('/dashboard', { replace: true });
+        navigate('/dashboard', { 
+          state: { from: location.pathname },
+          replace: true 
+        });
         return;
       }
 
@@ -161,7 +167,10 @@ export function ProtectedRoute({
         const hasPerm = role === 'super_admin' || hasPermission(requiredPermission.module, requiredPermission.action);
         if (!hasPerm) {
           console.log(`🚫 Permission denied. Required: ${requiredPermission.module}.${requiredPermission.action}`);
-          navigate('/dashboard', { replace: true });
+          navigate('/dashboard', { 
+            state: { from: location.pathname },
+            replace: true 
+          });
           return;
         }
       }

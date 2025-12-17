@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Download, BookOpen, ArrowLeft, Star, MessageCircle, Loader2, FileText, ExternalLink, Eye } from 'lucide-react';
 import { PDFViewer } from '@/components/library/PDFViewer';
+import { BackButton } from '@/components/BackButton';
 
 interface Book {
   id: string;
@@ -250,10 +251,11 @@ export default function BookDetail() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <Button variant="ghost" onClick={() => navigate('/library')} className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Library
-      </Button>
+      <BackButton 
+        label="Back to Library"
+        fallbackPath="/library"
+        className="mb-6"
+      />
 
       {/* Book Header */}
       <div className="flex flex-col md:flex-row gap-6 mb-6">

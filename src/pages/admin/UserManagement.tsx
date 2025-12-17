@@ -62,6 +62,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PermissionMatrixCard } from '@/components/permissions/PermissionMatrixCard';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 
 type UserWithRoles = {
   id: string;
@@ -192,7 +194,7 @@ export default function UserManagement() {
     if (!loading && !user) {
       navigate('/auth');
     } else if (!loading && role !== 'super_admin' && role !== 'admin') {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
     }
   }, [user, role, loading, navigate]);
 
@@ -643,9 +645,11 @@ export default function UserManagement() {
         <div className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <Button onClick={() => navigate('/dashboard/admin')} variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <BackButton 
+                fallbackPath="/dashboard/admin"
+                fallbackLabel="Back to Admin Dashboard"
+                size="icon"
+              />
               <div>
                 <h1 className="text-3xl font-bold flex items-center gap-3 text-foreground">
                   <div className="p-2 bg-primary/10 rounded-lg">

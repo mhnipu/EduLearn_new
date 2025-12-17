@@ -18,6 +18,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 
 interface Quiz {
   id: string;
@@ -134,7 +136,7 @@ export default function QuizExamTaking() {
         if (quizError) throw quizError;
         if (!quizData) {
           toast({ title: 'Quiz not found', variant: 'destructive' });
-          navigate('/dashboard/student');
+          navigate(getDashboardPath(role));
           return;
         }
 
@@ -398,10 +400,10 @@ export default function QuizExamTaking() {
               <p className="text-muted-foreground mb-4">
                 You have already completed the maximum number of attempts for this quiz.
               </p>
-              <Button onClick={() => navigate('/dashboard/student')}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Button>
+              <BackButton 
+                fallbackPath="/dashboard/student"
+                fallbackLabel="Back to Student Dashboard"
+              />
             </CardContent>
           </Card>
         </div>
@@ -443,9 +445,11 @@ export default function QuizExamTaking() {
         <div className="max-w-6xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/student')}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <BackButton 
+                fallbackPath="/dashboard/student"
+                fallbackLabel="Back to Student Dashboard"
+                size="icon"
+              />
               <div>
                 <h1 className="font-bold text-lg">{quiz.title}</h1>
                 <p className="text-sm text-muted-foreground">

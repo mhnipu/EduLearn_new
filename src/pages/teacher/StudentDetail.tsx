@@ -24,6 +24,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { getDashboardPath } from '@/lib/navigation';
 
 interface StudentProfile {
   id: string;
@@ -67,7 +68,7 @@ export default function StudentDetail() {
       return;
     }
     if (!authLoading && role !== 'teacher' && !['super_admin', 'admin'].includes(role || '')) {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
       return;
     }
   }, [user, role, authLoading, navigate]);

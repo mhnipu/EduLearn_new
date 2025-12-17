@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Star, MessageCircle, Loader2, Clock, Eye, Play, ExternalLink } from 'lucide-react';
 import { VideoPlayer, detectVideoType, getVideoThumbnail } from '@/components/library/VideoPlayer';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
+import { BackButton } from '@/components/BackButton';
 
 interface VideoItem {
   id: string;
@@ -203,10 +204,11 @@ export default function VideoDetail() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <Button variant="ghost" onClick={() => navigate('/library')} className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Library
-      </Button>
+      <BackButton 
+        label="Back to Library"
+        fallbackPath="/library"
+        className="mb-6"
+      />
 
       <div className="space-y-6">
         <Card>

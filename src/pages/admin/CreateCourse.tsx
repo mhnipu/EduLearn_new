@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Plus, Loader2, Upload, X, Image, Clock, User, Users } from 'lucide-react';
 import { z } from 'zod';
 import { CategoryMultiSelect } from '@/components/CategoryMultiSelect';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 
 const courseSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
@@ -38,7 +40,7 @@ export default function CreateCourse() {
 
   useEffect(() => {
     if (!loading && role && role !== 'admin' && role !== 'super_admin') {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
     }
   }, [role, loading, navigate]);
 
@@ -199,10 +201,11 @@ export default function CreateCourse() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Button onClick={() => navigate('/dashboard/admin')} variant="ghost" className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
-      </Button>
+      <BackButton 
+        fallbackPath="/dashboard/admin"
+        fallbackLabel="Back to Admin Dashboard"
+        className="mb-6"
+      />
 
       <Card>
         <CardHeader>

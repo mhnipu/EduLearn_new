@@ -12,6 +12,7 @@ import { ArrowLeft, Plus, Video, FileText, Trash2, Edit, Eye, BookOpen, Library 
 import { z } from 'zod';
 import { LibrarySelector } from '@/components/course/LibrarySelector';
 import { AttachedLibraryItems, AttachedBook, AttachedVideo } from '@/components/course/AttachedLibraryItems';
+import { BackButton } from '@/components/BackButton';
 
 const materialSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters').max(200),
@@ -252,10 +253,10 @@ export default function CourseMaterials() {
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       {/* Navigation Header */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
-        <Button onClick={() => navigate('/dashboard/admin')} variant="ghost">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Dashboard
-        </Button>
+        <BackButton 
+          fallbackPath="/dashboard/admin"
+          fallbackLabel="Back to Admin Dashboard"
+        />
         <Button onClick={() => navigate(`/admin/courses/${courseId}/edit`)} variant="outline">
           <Edit className="mr-2 h-4 w-4" />
           Edit Course Details

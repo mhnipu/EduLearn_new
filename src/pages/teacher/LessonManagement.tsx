@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Plus, Trash2, GripVertical, Video, FileText, Save } from 'lucide-react';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 
 interface Lesson {
   id: string;
@@ -60,7 +62,7 @@ const LessonManagement = () => {
       // Check permission
       if (courseData.created_by !== user?.id && !['super_admin', 'admin'].includes(role || '')) {
         toast({ title: 'Access denied', variant: 'destructive' });
-        navigate('/dashboard/teacher');
+        navigate(getDashboardPath(role));
         return;
       }
 
@@ -201,9 +203,11 @@ const LessonManagement = () => {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton 
+            fallbackPath="/dashboard/teacher"
+            fallbackLabel="Back to Teacher Dashboard"
+            size="icon"
+          />
           <div>
             <h1 className="text-2xl font-bold text-foreground">Manage Lessons</h1>
             <p className="text-muted-foreground">{course?.title}</p>

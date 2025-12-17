@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { BackButton } from '@/components/BackButton';
 
 type LandingCms = {
   badge: string;
@@ -111,9 +112,10 @@ export default function SiteContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-              <Button variant="ghost" onClick={() => navigate('/dashboard/admin')}>
-                Back to Admin Dashboard
-              </Button>
+              <BackButton 
+                fallbackPath="/dashboard/admin"
+                fallbackLabel="Back to Admin Dashboard"
+              />
               <Button onClick={() => navigate('/')}>View Landing</Button>
             </div>
 

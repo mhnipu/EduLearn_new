@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Loader2, X, Image, Clock, User, Users } from 'lucide-react';
 import { z } from 'zod';
 import { CategoryMultiSelect } from '@/components/CategoryMultiSelect';
+import { getDashboardPath } from '@/lib/navigation';
 
 const courseSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
@@ -42,7 +43,7 @@ export default function EditCourse() {
 
   useEffect(() => {
     if (!authLoading && role && role !== 'admin' && role !== 'super_admin') {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
     }
   }, [role, authLoading, navigate]);
 

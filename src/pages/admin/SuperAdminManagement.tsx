@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { getDashboardPath } from '@/lib/navigation';
 import { 
   Loader2, 
   Shield, 
@@ -223,7 +224,7 @@ export default function SuperAdminManagement() {
     if (!loading && !user) {
       navigate('/auth');
     } else if (!loading && role !== 'super_admin') {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
     }
   }, [user, role, loading, navigate]);
 

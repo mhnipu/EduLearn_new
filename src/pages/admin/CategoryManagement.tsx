@@ -36,6 +36,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Tags, Plus, Edit, Trash2, Search, ArrowLeft } from 'lucide-react';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 
 interface Category {
   id: string;
@@ -68,7 +70,7 @@ export default function CategoryManagement() {
     if (!loading && !user) {
       navigate('/auth');
     } else if (!loading && role !== 'super_admin' && role !== 'admin') {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
     }
   }, [user, role, loading, navigate]);
 
@@ -190,10 +192,11 @@ export default function CategoryManagement() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Button onClick={() => navigate('/dashboard/admin')} variant="ghost" className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
-      </Button>
+      <BackButton 
+        fallbackPath="/dashboard/admin"
+        fallbackLabel="Back to Admin Dashboard"
+        className="mb-6"
+      />
 
       <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
         <div>

@@ -16,6 +16,7 @@ import {
   Shield, Lock, Unlock, UserCheck, Mail, Bell
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getDashboardPath } from '@/lib/navigation';
 import {
   AreaChart, Area, BarChart, Bar, LineChart as RechartsLineChart, Line,
   PieChart as RechartsPieChart, Pie, Cell,
@@ -78,7 +79,7 @@ export default function SystemMonitoring() {
     if (!loading && !user) {
       navigate('/auth');
     } else if (!loading && role && !['admin', 'super_admin'].includes(role)) {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
     }
   }, [user, role, loading, navigate]);
 

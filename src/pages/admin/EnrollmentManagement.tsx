@@ -15,9 +15,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, formatDistanceToNow } from 'date-fns';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 import {
   Users, BookOpen, Search, Filter, Download, Mail, Trash2,
   LayoutGrid, LayoutList, Clock, CheckCircle, XCircle, ListOrdered,
@@ -134,7 +136,7 @@ export default function EnrollmentManagement() {
 
   useEffect(() => {
     if (role !== 'admin' && role !== 'super_admin') {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
       return;
     }
     fetchData();
@@ -710,14 +712,12 @@ export default function EnrollmentManagement() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-border/50 shadow-sm">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
+              <BackButton 
+                fallbackPath="/dashboard/admin"
+                fallbackLabel="Back to Admin Dashboard"
                 size="icon"
-                onClick={() => navigate('/dashboard')}
                 className="hover:bg-primary/10"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              />
               <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
                 <GraduationCap className="h-6 w-6 text-white" />
               </div>

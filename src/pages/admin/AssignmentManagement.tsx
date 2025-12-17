@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { FileDropzone } from '@/components/library/FileDropzone';
+import { BackButton } from '@/components/BackButton';
 
 interface Assignment {
   id: string;
@@ -511,9 +512,11 @@ export default function AssignmentManagement() {
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/admin')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton 
+              fallbackPath="/dashboard/admin"
+              fallbackLabel="Back to Admin Dashboard"
+              size="icon"
+            />
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-2 text-foreground">
                 <FileText className="h-8 w-8 text-primary" />

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { GraduationCap, BookOpen, Video, FileText, Users, Award, Zap, Clock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
+import { getDashboardPath } from '@/lib/navigation';
 
 // Icon mapping for dynamic icon rendering
 const iconMap: Record<string, any> = {
@@ -40,15 +41,7 @@ export default function Landing() {
       // Only allow unauthenticated users or admins/super_admins to view landing page
       if (!['super_admin', 'admin'].includes(role)) {
         // Redirect to appropriate dashboard based on role
-        if (role === 'guardian') {
-          navigate('/dashboard/guardian', { replace: true });
-        } else if (role === 'teacher') {
-          navigate('/dashboard/teacher', { replace: true });
-        } else if (role === 'student') {
-          navigate('/dashboard/student', { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
+        navigate(getDashboardPath(role), { replace: true });
         return;
       }
     }

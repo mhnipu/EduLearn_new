@@ -16,6 +16,7 @@ import { CourseCurriculum } from '@/components/course/CourseCurriculum';
 import { CourseReviews } from '@/components/course/CourseReviews';
 import { CourseResources } from '@/components/course/CourseResources';
 import { EnrolledStudents } from '@/components/course/EnrolledStudents';
+import { BackButton } from '@/components/BackButton';
 
 interface Course {
   id: string;
@@ -504,10 +505,11 @@ export default function CourseDetail() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <h3 className="text-xl font-semibold mb-2">Course not found</h3>
-            <Button onClick={() => navigate('/courses')} variant="outline">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Courses
-            </Button>
+            <BackButton 
+              fallbackPath="/courses"
+              fallbackLabel="Back to Courses"
+              variant="outline"
+            />
           </CardContent>
         </Card>
       </div>

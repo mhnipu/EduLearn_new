@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, BookOpen, Video, Users, Plus, Trash2, Loader2 } from 'lucide-react';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 import {
   Table,
   TableBody,
@@ -66,7 +68,7 @@ export default function ContentAssignments() {
 
   useEffect(() => {
     if (!authLoading && role !== 'admin' && role !== 'super_admin') {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
       toast({ title: 'Access denied', variant: 'destructive' });
     }
   }, [role, authLoading, navigate]);
@@ -275,10 +277,11 @@ export default function ContentAssignments() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Button onClick={() => navigate('/dashboard/admin')} variant="ghost" className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
-      </Button>
+      <BackButton 
+        fallbackPath="/dashboard/admin"
+        fallbackLabel="Back to Admin Dashboard"
+        className="mb-6"
+      />
 
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Content Assignments</h1>

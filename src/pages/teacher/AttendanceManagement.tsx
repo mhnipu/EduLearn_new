@@ -29,6 +29,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Calendar, Plus, CheckCircle2, XCircle, Clock, UserCheck, Users, TrendingUp, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { getDashboardPath } from '@/lib/navigation';
 
 interface AttendanceSession {
   id: string;
@@ -88,7 +89,7 @@ const AttendanceManagement = () => {
       return;
     }
     if (!authLoading && role !== 'teacher' && !['super_admin', 'admin'].includes(role || '')) {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
       return;
     }
   }, [user, role, authLoading, navigate]);

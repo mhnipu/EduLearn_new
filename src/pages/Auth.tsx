@@ -15,10 +15,11 @@ import { supabase } from '@/integrations/supabase/client';
 
 const DEFAULT_SUPER_ADMIN_EMAIL = 'super@gmail.com';
 
+// Use centralized navigation utility
+import { getDashboardPath as getDashboardPathUtil } from '@/lib/navigation';
 const getDashboardPath = (role: string | null) => {
   if (!role) return '/pending-approval';
-  if (role === 'super_admin' || role === 'admin') return '/dashboard/admin';
-  return `/dashboard/${role}`;
+  return getDashboardPathUtil(role);
 };
 
 const loginEmailSchema = z.object({
@@ -277,7 +278,7 @@ export default function AuthEnhanced() {
         });
 
         // Let auth context load roles, then redirect
-        navigate('/dashboard', { replace: true });
+        navigate(getDashboardPath(role), { replace: true });
       }
     } catch (error) {
       if (error instanceof z.ZodError) {

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Mail, Phone, MapPin, AlertCircle, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { getDashboardPath } from '@/lib/navigation';
 
 export default function ProfileCompletion() {
   const { user, role } = useAuth();
@@ -48,7 +49,7 @@ export default function ProfileCompletion() {
 
       if (error) {
         console.error('Error verifying role:', error);
-        navigate('/dashboard');
+        navigate(getDashboardPath(role));
         return;
       }
 
@@ -58,13 +59,13 @@ export default function ProfileCompletion() {
 
       // If user has guardian/teacher/admin role, redirect to their dashboard
       if (hasNonStudentRole) {
-        navigate('/dashboard');
+        navigate(getDashboardPath(role));
         return;
       }
 
       // Only proceed if user has ONLY student role
       if (!hasStudentRole) {
-        navigate('/dashboard');
+        navigate(getDashboardPath(role));
         return;
       }
 

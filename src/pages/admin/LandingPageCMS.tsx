@@ -10,6 +10,7 @@ import { SectionList } from '@/components/cms/SectionList';
 import { SectionEditor } from '@/components/cms/SectionEditor';
 import { SectionLibrary } from '@/components/cms/SectionLibrary';
 import { getDefaultContent, getSectionSchema } from '@/lib/cms/sectionSchemas';
+import { BackButton } from '@/components/BackButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,7 +76,7 @@ export default function LandingPageCMS() {
         .order('order_index', { ascending: true });
 
       if (error) throw error;
-      setSections((data || []) as PageSection[]);
+      setSections((data || []) as unknown as PageSection[]);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -115,6 +116,7 @@ export default function LandingPageCMS() {
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error('Failed to create section');
 
       toast({
         title: 'Success',
@@ -122,7 +124,7 @@ export default function LandingPageCMS() {
       });
 
       await fetchSections();
-      setEditingSection(data as PageSection);
+      setEditingSection(data as unknown as PageSection);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -321,9 +323,10 @@ export default function LandingPageCMS() {
             <p className="text-muted-foreground">Manage landing page sections (Super Admin Only)</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/dashboard/admin')}>
-              Back to Dashboard
-            </Button>
+            <BackButton 
+              fallbackPath="/dashboard/admin"
+              fallbackLabel="Back to Admin Dashboard"
+            />
             <Button variant="outline" onClick={() => navigate('/')}>
               View Landing Page
             </Button>

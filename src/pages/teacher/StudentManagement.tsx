@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Users, Search, Mail, Phone, Calendar, BookOpen, TrendingUp, Clock, CheckCircle2, XCircle, Clock as ClockIcon, AlertCircle, Eye } from 'lucide-react';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 import {
   Table,
   TableBody,
@@ -82,7 +84,7 @@ const StudentManagement = () => {
       return;
     }
     if (!authLoading && role !== 'teacher' && !['super_admin', 'admin'].includes(role || '')) {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
       return;
     }
   }, [user, role, authLoading, navigate]);
@@ -775,13 +777,11 @@ const StudentManagement = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
+            <BackButton 
+              fallbackPath="/dashboard/teacher"
+              fallbackLabel="Back to Teacher Dashboard"
               size="icon"
-              onClick={() => navigate('/dashboard/teacher')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            />
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-2">
                 <Users className="h-8 w-8 text-primary" />

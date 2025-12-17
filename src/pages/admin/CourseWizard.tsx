@@ -15,6 +15,8 @@ import { LibrarySelector } from '@/components/course/LibrarySelector';
 import { AttachedLibraryItems, AttachedBook, AttachedVideo } from '@/components/course/AttachedLibraryItems';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { BackButton } from '@/components/BackButton';
+import { getDashboardPath } from '@/lib/navigation';
 import {
   ArrowLeft,
   ArrowRight,
@@ -137,9 +139,9 @@ export default function CourseWizard() {
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
-      navigate('/dashboard');
+      navigate(getDashboardPath(role));
     }
-  }, [authLoading, isAdmin, navigate]);
+  }, [authLoading, isAdmin, navigate, role]);
 
   useEffect(() => {
     fetchInitialData();
@@ -690,9 +692,11 @@ export default function CourseWizard() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/admin')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton 
+            fallbackPath="/dashboard/admin"
+            fallbackLabel="Back to Admin Dashboard"
+            size="icon"
+          />
           <div>
             <h1 className="text-2xl font-bold text-foreground">
               {isEditing ? 'Edit Course' : 'Create New Course'}

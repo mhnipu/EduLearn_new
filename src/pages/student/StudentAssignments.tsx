@@ -24,6 +24,7 @@ import {
   Download,
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
+import { BackButton } from '@/components/BackButton';
 
 interface Assignment {
   id: string;
@@ -315,9 +316,11 @@ export default function StudentAssignments() {
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/student')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton 
+            fallbackPath="/dashboard/student"
+            fallbackLabel="Back to Student Dashboard"
+            size="icon"
+          />
           <div>
             <h1 className="text-2xl font-bold text-foreground">My Assignments</h1>
             <p className="text-muted-foreground">View and submit your assignments</p>

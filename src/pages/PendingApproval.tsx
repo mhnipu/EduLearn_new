@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Clock, LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { getDashboardPath } from '@/lib/navigation';
 
 export default function PendingApproval() {
   const { user, role, loading, signOut } = useAuth();
@@ -15,11 +16,7 @@ export default function PendingApproval() {
         navigate('/auth');
       } else if (role) {
         // User now has a role, redirect to their dashboard
-        if (role === 'super_admin' || role === 'admin') {
-          navigate('/dashboard/admin', { replace: true });
-        } else {
-          navigate(`/dashboard/${role}`, { replace: true });
-        }
+        navigate(getDashboardPath(role), { replace: true });
       }
     }
   }, [user, role, loading, navigate]);

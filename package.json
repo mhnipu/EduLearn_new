@@ -8,7 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate": "node scripts/apply-migrations-sequential.js",
+    "migrate:cli": "powershell -ExecutionPolicy Bypass -File scripts/apply-migrations-sequential.ps1",
+    "migrate:guide": "powershell -ExecutionPolicy Bypass -File scripts/apply-migrations-manual-guide.ps1"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

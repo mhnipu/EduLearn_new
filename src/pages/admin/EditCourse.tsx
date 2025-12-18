@@ -95,6 +95,9 @@ export default function EditCourse() {
       setMaxCapacity((course as any).max_capacity || null);
       if (course.thumbnail_url) {
         setThumbnailPreview(course.thumbnail_url);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:97',message:'Course fetched - thumbnail_url from DB',data:{courseId,courseThumbnailUrl:course.thumbnail_url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
       }
 
       // Fetch categories
@@ -121,8 +124,12 @@ export default function EditCourse() {
         toast({ title: 'Image must be less than 5MB', variant: 'destructive' });
         return;
       }
+      const blobUrl = URL.createObjectURL(file);
       setThumbnailFile(file);
-      setThumbnailPreview(URL.createObjectURL(file));
+      setThumbnailPreview(blobUrl);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:125',message:'Thumbnail file selected',data:{fileName:file.name,fileSize:file.size,blobUrl,isBlobUrl:blobUrl.startsWith('blob:')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
     }
   };
 
@@ -135,10 +142,19 @@ export default function EditCourse() {
   };
 
   const uploadThumbnail = async (): Promise<string | null> => {
-    if (!thumbnailFile || !courseId) return null;
+    if (!thumbnailFile || !courseId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:138',message:'uploadThumbnail early return - missing file or courseId',data:{hasThumbnailFile:!!thumbnailFile,hasCourseId:!!courseId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return null;
+    }
 
     const fileExt = thumbnailFile.name.split('.').pop();
     const fileName = `courses/${courseId}/thumbnail.${fileExt}`;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:143',message:'Starting thumbnail upload',data:{fileName,fileExt,fileSize:thumbnailFile.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
 
     const { error: uploadError } = await supabase.storage
       .from('library-files')
@@ -146,6 +162,9 @@ export default function EditCourse() {
 
     if (uploadError) {
       console.error('Thumbnail upload error:', uploadError);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:148',message:'Thumbnail upload failed',data:{uploadError:uploadError.message,uploadErrorCode:uploadError.statusCode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       return null;
     }
 
@@ -153,7 +172,12 @@ export default function EditCourse() {
       .from('library-files')
       .getPublicUrl(fileName);
 
-    return urlData?.publicUrl || null;
+    const publicUrl = urlData?.publicUrl || null;
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:156',message:'Thumbnail upload succeeded',data:{publicUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
+    return publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -163,13 +187,37 @@ export default function EditCourse() {
     try {
       courseSchema.parse({ title, description });
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:166',message:'handleSubmit start - thumbnail state',data:{hasThumbnailFile:!!thumbnailFile,thumbnailPreview,isBlobUrl:thumbnailPreview?.startsWith('blob:'),isSupabaseUrl:thumbnailPreview?.includes('supabase')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+
       let thumbnailUrl = thumbnailPreview;
 
       // Upload new thumbnail if selected
       if (thumbnailFile) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:172',message:'Thumbnail file exists - attempting upload',data:{fileName:thumbnailFile.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         const newUrl = await uploadThumbnail();
-        if (newUrl) thumbnailUrl = newUrl;
+        if (newUrl) {
+          thumbnailUrl = newUrl;
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:175',message:'Thumbnail URL updated from upload',data:{newUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:178',message:'Upload returned null - keeping thumbnailPreview',data:{thumbnailPreview},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+        }
+      } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:181',message:'No thumbnail file - using thumbnailPreview',data:{thumbnailUrl,isBlobUrl:thumbnailUrl?.startsWith('blob:')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
       }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:186',message:'Before database update - final thumbnailUrl',data:{thumbnailUrl,isBlobUrl:thumbnailUrl?.startsWith('blob:'),isSupabaseUrl:thumbnailUrl?.includes('supabase')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
 
       // Update course
       const { error } = await supabase
@@ -185,7 +233,16 @@ export default function EditCourse() {
         } as any)
         .eq('id', courseId);
 
-      if (error) throw error;
+      if (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:200',message:'Database update error',data:{error:error.message,errorCode:error.code,errorDetails:error.details},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        throw error;
+      }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EditCourse.tsx:204',message:'Database update succeeded',data:{thumbnailUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
 
       // Update categories - delete existing and insert new
       await supabase.from('course_categories').delete().eq('course_id', courseId);

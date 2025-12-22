@@ -11,6 +11,8 @@ interface ModulePermission {
   can_read: boolean;
   can_update: boolean;
   can_delete: boolean;
+  can_assign?: boolean;
+  can_approve?: boolean;
 }
 
 interface AuthContextType {
@@ -81,25 +83,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserPermissions = async (userId: string) => {
     try {
+      // Use the new database function that aggregates permissions from roles
+      // This ensures users get permissions from their roles, not user_module_permissions
       const { data, error } = await supabase
-        .from('user_module_permissions')
-        .select(`
-          can_create,
-          can_read,
-          can_update,
-          can_delete,
-          modules!inner(name)
-        `)
-        .eq('user_id', userId);
+        .rpc('get_user_effective_permissions', { _user_id: userId });
 
       if (error) throw error;
 
       const modulePermissions: ModulePermission[] = (data || []).map((p: any) => ({
-        module_name: p.modules.name,
-        can_create: p.can_create,
-        can_read: p.can_read,
-        can_update: p.can_update,
-        can_delete: p.can_delete,
+        module_name: p.module_name,
+        can_create: p.can_create || false,
+        can_read: p.can_read || false,
+        can_update: p.can_update || false,
+        can_delete: p.can_delete || false,
+        can_assign: p.can_assign || false,
+        can_approve: p.can_approve || false,
       }));
 
       setPermissions(modulePermissions);

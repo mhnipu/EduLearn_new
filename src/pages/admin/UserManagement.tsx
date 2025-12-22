@@ -54,7 +54,8 @@ import {
   ChevronDown,
   LayoutGrid,
   LayoutList,
-  User
+  User,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -106,7 +107,8 @@ type PermissionMatrix = {
   permission_count: number;
 };
 
-type BulkAction = 'add_role' | 'remove_role' | 'grant_permission' | 'revoke_permission';
+// DEPRECATED: grant_permission and revoke_permission removed - permissions are now managed at role level
+type BulkAction = 'add_role' | 'remove_role';
 
 // Super Admin can only assign super_admin role
 const SUPER_ADMIN_ASSIGNABLE_ROLES = ['super_admin'] as const;
@@ -319,38 +321,61 @@ export default function UserManagement() {
 
   const fetchPermissionMatrix = async (usersList: UserWithRoles[]) => {
     try {
-      const { data: allPermissions, error } = await supabase
-        .from('user_module_permissions')
-        .select('user_id, module_id, can_create, can_read, can_update, can_delete');
+      // Fetch effective permissions from roles for each user using the new database function
+      const matrix: PermissionMatrix[] = await Promise.all(
+        usersList.map(async (u) => {
+          const { data: effectivePerms, error } = await supabase
+            .rpc('get_user_effective_permissions', { _user_id: u.id });
 
-      if (error) throw error;
+          if (error) {
+            console.error(`Error fetching permissions for user ${u.id}:`, error);
+            return {
+              user_id: u.id,
+              user_name: u.full_name,
+              avatar_url: u.avatar_url,
+              roles: u.roles,
+              created_at: u.created_at,
+              permissions: {},
+              permission_count: 0,
+            };
+          }
 
-      const matrix: PermissionMatrix[] = usersList.map(u => {
-        const userPerms = (allPermissions || []).filter(p => p.user_id === u.id);
-        const permsByModule: Record<string, any> = {};
-        let permCount = 0;
-        userPerms.forEach(p => {
-          permsByModule[p.module_id] = {
-            can_create: p.can_create,
-            can_read: p.can_read,
-            can_update: p.can_update,
-            can_delete: p.can_delete,
+          const permsByModule: Record<string, any> = {};
+          let permCount = 0;
+
+          // Map permissions by module_id (need to get module_id from module_name)
+          const moduleIdMap: Record<string, string> = {};
+          modules.forEach(m => {
+            moduleIdMap[m.name] = m.id;
+          });
+
+          (effectivePerms || []).forEach((p: any) => {
+            const moduleId = moduleIdMap[p.module_name];
+            if (moduleId) {
+              permsByModule[moduleId] = {
+                can_create: p.can_create || false,
+                can_read: p.can_read || false,
+                can_update: p.can_update || false,
+                can_delete: p.can_delete || false,
+              };
+              if (p.can_create) permCount++;
+              if (p.can_read) permCount++;
+              if (p.can_update) permCount++;
+              if (p.can_delete) permCount++;
+            }
+          });
+
+          return {
+            user_id: u.id,
+            user_name: u.full_name,
+            avatar_url: u.avatar_url,
+            roles: u.roles,
+            created_at: u.created_at,
+            permissions: permsByModule,
+            permission_count: permCount,
           };
-          if (p.can_create) permCount++;
-          if (p.can_read) permCount++;
-          if (p.can_update) permCount++;
-          if (p.can_delete) permCount++;
-        });
-        return { 
-          user_id: u.id, 
-          user_name: u.full_name, 
-          avatar_url: u.avatar_url,
-          roles: u.roles, 
-          created_at: u.created_at,
-          permissions: permsByModule,
-          permission_count: permCount,
-        };
-      });
+        })
+      );
 
       setPermissionMatrix(matrix);
     } catch (error) {
@@ -358,33 +383,49 @@ export default function UserManagement() {
     }
   };
 
+  // DEPRECATED: User-level permissions are no longer used in pure RBAC system
+  // Permissions are now assigned to roles, and users inherit from their roles
+  // Keeping function signature for backward compatibility but it now fetches effective permissions from roles
   const fetchUserPermissions = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_module_permissions')
-        .select('module_id, can_create, can_read, can_update, can_delete, modules!inner(name)')
-        .eq('user_id', userId);
+      // Use the new database function to get effective permissions from roles
+      const { data: effectivePerms, error } = await supabase
+        .rpc('get_user_effective_permissions', { _user_id: userId });
 
       if (error) throw error;
 
-      const perms: UserModulePermission[] = (data || []).map((p: any) => ({
-        module_id: p.module_id,
-        module_name: p.modules.name,
-        can_create: p.can_create,
-        can_read: p.can_read,
-        can_update: p.can_update,
-        can_delete: p.can_delete,
+      const moduleIdMap: Record<string, string> = {};
+      modules.forEach(m => {
+        moduleIdMap[m.name] = m.id;
+      });
+
+      const perms: UserModulePermission[] = (effectivePerms || []).map((p: any) => ({
+        module_id: moduleIdMap[p.module_name] || '',
+        module_name: p.module_name,
+        can_create: p.can_create || false,
+        can_read: p.can_read || false,
+        can_update: p.can_update || false,
+        can_delete: p.can_delete || false,
       }));
 
-      const existingModuleIds = new Set(perms.map(p => p.module_id));
+      // Add modules that user has no permissions for (for display completeness)
+      const existingModuleNames = new Set(perms.map(p => p.module_name));
       modules.forEach(m => {
-        if (!existingModuleIds.has(m.id)) {
-          perms.push({ module_id: m.id, module_name: m.name, can_create: false, can_read: false, can_update: false, can_delete: false });
+        if (!existingModuleNames.has(m.name)) {
+          perms.push({ 
+            module_id: m.id, 
+            module_name: m.name, 
+            can_create: false, 
+            can_read: false, 
+            can_update: false, 
+            can_delete: false 
+          });
         }
       });
 
       setUserPermissions(perms.sort((a, b) => a.module_name.localeCompare(b.module_name)));
     } catch (error) {
+      console.error('Error fetching user effective permissions:', error);
       setUserPermissions([]);
     }
   };
@@ -411,59 +452,31 @@ export default function UserManagement() {
     }
   };
 
+  // DEPRECATED: User-level permission editing is removed in pure RBAC system
+  // Permissions are now managed at the role level via Role Permission Management page
+  // These functions are kept for backward compatibility but show a message directing to role management
   const updatePermission = async (moduleId: string, field: 'can_create' | 'can_read' | 'can_update' | 'can_delete', value: boolean) => {
-    if (!selectedUser) return;
-
-    try {
-      const { data: existing } = await supabase
-        .from('user_module_permissions')
-        .select('id')
-        .eq('user_id', selectedUser.id)
-        .eq('module_id', moduleId)
-        .single();
-
-      if (existing) {
-        const { error } = await supabase.from('user_module_permissions').update({ [field]: value }).eq('user_id', selectedUser.id).eq('module_id', moduleId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('user_module_permissions').insert({ user_id: selectedUser.id, module_id: moduleId, [field]: value });
-        if (error) throw error;
-      }
-
-      setUserPermissions(prev => prev.map(p => p.module_id === moduleId ? { ...p, [field]: value } : p));
-      toast({ title: 'Permission Updated' });
-      fetchPermissionMatrix(users);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
+    toast({ 
+      title: 'Permission Management Changed', 
+      description: 'Permissions are now managed at the role level. Please use Role Permission Management to update role permissions.',
+      variant: 'default'
+    });
+    navigate('/admin/role-permissions');
   };
 
   const setAllPermissions = async (moduleId: string, grant: boolean) => {
-    if (!selectedUser) return;
-
-    try {
-      const permData = { can_create: grant, can_read: grant, can_update: grant, can_delete: grant };
-      const { data: existing } = await supabase.from('user_module_permissions').select('id').eq('user_id', selectedUser.id).eq('module_id', moduleId).single();
-
-      if (existing) {
-        const { error } = await supabase.from('user_module_permissions').update(permData).eq('user_id', selectedUser.id).eq('module_id', moduleId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('user_module_permissions').insert({ user_id: selectedUser.id, module_id: moduleId, ...permData });
-        if (error) throw error;
-      }
-
-      setUserPermissions(prev => prev.map(p => p.module_id === moduleId ? { ...p, ...permData } : p));
-      toast({ title: 'Permissions Updated', description: grant ? 'Granted full access' : 'Revoked all access' });
-      fetchPermissionMatrix(users);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
+    toast({ 
+      title: 'Permission Management Changed', 
+      description: 'Permissions are now managed at the role level. Please use Role Permission Management to update role permissions.',
+      variant: 'default'
+    });
+    navigate('/admin/role-permissions');
   };
 
+  // DEPRECATED: User-level permission editing removed - redirect to role permission management
   const openPermissionsDialog = async (userItem: UserWithRoles) => {
     setSelectedUser(userItem);
-    await fetchUserPermissions(userItem.id);
+    await fetchUserPermissions(userItem.id); // Fetch to show effective permissions (read-only)
     setIsPermissionsDialogOpen(true);
   };
 
@@ -507,31 +520,14 @@ export default function UserManagement() {
           await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', bulkRole as any);
         }
         toast({ title: 'Bulk Action Complete', description: `Removed ${bulkRole} role from ${userIds.length} users` });
-      } else if (bulkAction === 'grant_permission' && bulkModule) {
-        const permData = bulkPermission === 'all' 
-          ? { can_create: true, can_read: true, can_update: true, can_delete: true }
-          : { [`can_${bulkPermission}`]: true };
-
-        for (const userId of userIds) {
-          const { data: existing } = await supabase.from('user_module_permissions')
-            .select('id').eq('user_id', userId).eq('module_id', bulkModule).single();
-          
-          if (existing) {
-            await supabase.from('user_module_permissions').update(permData).eq('user_id', userId).eq('module_id', bulkModule);
-          } else {
-            await supabase.from('user_module_permissions').insert({ user_id: userId, module_id: bulkModule, ...permData });
-          }
-        }
-        toast({ title: 'Bulk Action Complete', description: `Granted permissions to ${userIds.length} users` });
-      } else if (bulkAction === 'revoke_permission' && bulkModule) {
-        const permData = bulkPermission === 'all'
-          ? { can_create: false, can_read: false, can_update: false, can_delete: false }
-          : { [`can_${bulkPermission}`]: false };
-
-        for (const userId of userIds) {
-          await supabase.from('user_module_permissions').update(permData).eq('user_id', userId).eq('module_id', bulkModule);
-        }
-        toast({ title: 'Bulk Action Complete', description: `Revoked permissions from ${userIds.length} users` });
+      } else if (bulkAction === 'grant_permission' || bulkAction === 'revoke_permission') {
+        // DEPRECATED: User-level permission editing removed in pure RBAC system
+        toast({ 
+          title: 'Permission Management Changed', 
+          description: 'Permissions are now managed at the role level. Please use Role Permission Management to update role permissions.',
+          variant: 'default'
+        });
+        navigate('/admin/role-permissions');
       }
 
       setIsBulkDialogOpen(false);
@@ -579,55 +575,15 @@ export default function UserManagement() {
     }
   }, [isMobile]);
 
-  // Handle inline permission toggle for mobile cards
+  // DEPRECATED: Inline permission toggle removed - permissions are now managed at role level
   const handleInlinePermissionToggle = async (userId: string, moduleId: string, field: keyof UserModulePermission, value: boolean) => {
-    try {
-      const { data: existing } = await supabase
-        .from('user_module_permissions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('module_id', moduleId)
-        .single();
-
-      if (existing) {
-        const { error } = await supabase
-          .from('user_module_permissions')
-          .update({ [field]: value })
-          .eq('user_id', userId)
-          .eq('module_id', moduleId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('user_module_permissions')
-          .insert({ user_id: userId, module_id: moduleId, [field]: value });
-        if (error) throw error;
-      }
-
-      // Update local state
-      setPermissionMatrix(prev => prev.map(u => {
-        if (u.user_id !== userId) return u;
-        const newPermissions = { ...u.permissions };
-        if (!newPermissions[moduleId]) {
-          newPermissions[moduleId] = { can_create: false, can_read: false, can_update: false, can_delete: false };
-        }
-        newPermissions[moduleId] = { ...newPermissions[moduleId], [field]: value };
-        
-        // Recalculate permission count
-        let permCount = 0;
-        Object.values(newPermissions).forEach(p => {
-          if (p.can_create) permCount++;
-          if (p.can_read) permCount++;
-          if (p.can_update) permCount++;
-          if (p.can_delete) permCount++;
-        });
-        
-        return { ...u, permissions: newPermissions, permission_count: permCount };
-      }));
-
-      toast({ title: 'Permission updated' });
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
+    toast({ 
+      title: 'Permission Management Changed', 
+      description: 'Permissions are now managed at the role level. Please use Role Permission Management to update role permissions.',
+      variant: 'default'
+    });
+    navigate('/admin/role-permissions');
+    // No state update needed - permissions are read-only
   };
 
   if (loading || isLoading) {
@@ -754,10 +710,20 @@ export default function UserManagement() {
             </TabsTrigger>
             {/* Permissions Matrix - Super Admin Only */}
             {isSuperAdmin && (
-              <TabsTrigger value="matrix" className="flex items-center gap-2 data-[state=active]:bg-background">
-                <Settings className="h-4 w-4" />
-                Permissions Matrix
-              </TabsTrigger>
+              <>
+                <TabsTrigger value="matrix" className="flex items-center gap-2 data-[state=active]:bg-background">
+                  <Settings className="h-4 w-4" />
+                  Permissions Matrix
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="role-permissions" 
+                  className="flex items-center gap-2 data-[state=active]:bg-background"
+                  onClick={() => navigate('/admin/role-permissions')}
+                >
+                  <Shield className="h-4 w-4" />
+                  Role Permissions
+                </TabsTrigger>
+              </>
             )}
           </TabsList>
 
@@ -769,7 +735,7 @@ export default function UserManagement() {
                   <div>
                     <CardTitle>User Role Management</CardTitle>
                     <CardDescription>
-                      {isSuperAdmin ? 'You have full access to manage all roles.' : 'You can only edit non-admin roles.'}
+                      Assign roles to users. Permissions are managed at the role level via Role Permission Management.
                     </CardDescription>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -821,11 +787,8 @@ export default function UserManagement() {
                     <Button size="sm" variant="outline" onClick={() => { setBulkAction('remove_role'); setIsBulkDialogOpen(true); }}>
                       <Trash2 className="h-4 w-4 mr-1" /> Remove Role
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setBulkAction('grant_permission'); setIsBulkDialogOpen(true); }}>
-                      <Eye className="h-4 w-4 mr-1" /> Grant Permission
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => { setBulkAction('revoke_permission'); setIsBulkDialogOpen(true); }}>
-                      <X className="h-4 w-4 mr-1" /> Revoke Permission
+                    <Button size="sm" variant="outline" onClick={() => navigate('/admin/role-permissions')}>
+                      <Shield className="h-4 w-4 mr-1" /> Manage Role Permissions
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setSelectedUsers(new Set())}>
                       Clear Selection
@@ -935,7 +898,7 @@ export default function UserManagement() {
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {/* Permissions Button - Super Admin Only */}
+                              {/* View Permissions Button - Shows effective permissions from roles (read-only) */}
                               {isSuperAdmin && (
                                 <Button
                                   size="sm"
@@ -943,8 +906,20 @@ export default function UserManagement() {
                                   onClick={() => openPermissionsDialog(userItem)}
                                   className="opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
-                                  <Settings className="h-4 w-4 mr-1" />
-                                  Permissions
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View Permissions
+                                </Button>
+                              )}
+                              {/* Manage Role Permissions Link */}
+                              {isSuperAdmin && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => navigate('/admin/role-permissions')}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                                  title="Manage Role Permissions"
+                                >
+                                  <Shield className="h-4 w-4" />
                                 </Button>
                               )}
                             </TableCell>
@@ -1171,20 +1146,38 @@ export default function UserManagement() {
           )}
         </Tabs>
 
-        {/* Permissions Dialog */}
+        {/* Permissions Dialog - Read Only (Effective Permissions from Roles) */}
         <Dialog open={isPermissionsDialogOpen} onOpenChange={setIsPermissionsDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Module Permissions for {selectedUser?.full_name}
+                <Eye className="h-5 w-5" />
+                Effective Permissions for {selectedUser?.full_name}
               </DialogTitle>
               <DialogDescription>
-                Configure what this user can do in each module ({userPermissions.length} modules)
+                <div className="space-y-2">
+                  <p>Viewing effective permissions derived from user roles ({userPermissions.length} modules)</p>
+                  {selectedUser && selectedUser.roles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <span className="text-xs font-medium">Roles:</span>
+                      {selectedUser.roles.map(role => (
+                        <Badge key={role} variant="secondary" className="capitalize">
+                          {role.replace('_', ' ')}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Permissions are managed at the role level. To change permissions, update the role permissions.
+                    </p>
+                  </div>
+                </div>
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
-              <ScrollArea className="h-[calc(85vh-150px)] pr-4">
+              <ScrollArea className="h-[calc(85vh-200px)] pr-4">
                 <div className="space-y-3 pb-4">
                   {userPermissions.map(perm => (
                     <Card key={perm.module_id} className="border">
@@ -1195,26 +1188,19 @@ export default function UserManagement() {
                             <span className="font-medium">{perm.module_name}</span>
                             <PermissionLevel permissions={perm} />
                           </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setAllPermissions(perm.module_id, true)}>
-                              Grant All
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setAllPermissions(perm.module_id, false)}>
-                              Revoke All
-                            </Button>
-                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="py-3 px-4 border-t">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                           {(['can_create', 'can_read', 'can_update', 'can_delete'] as const).map(field => (
-                            <label key={field} className="flex items-center gap-2 cursor-pointer">
+                            <div key={field} className="flex items-center gap-2">
                               <Checkbox
                                 checked={perm[field]}
-                                onCheckedChange={(checked) => updatePermission(perm.module_id, field, !!checked)}
+                                disabled
+                                className="cursor-not-allowed opacity-50"
                               />
                               <span className="text-sm capitalize">{field.replace('can_', '')}</span>
-                            </label>
+                            </div>
                           ))}
                         </div>
                       </CardContent>
@@ -1222,6 +1208,18 @@ export default function UserManagement() {
                   ))}
                 </div>
               </ScrollArea>
+            </div>
+            <div className="flex justify-between items-center pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                These permissions are inherited from the user's roles
+              </p>
+              <Button onClick={() => {
+                setIsPermissionsDialogOpen(false);
+                navigate('/admin/role-permissions');
+              }}>
+                <Shield className="h-4 w-4 mr-2" />
+                Manage Role Permissions
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -1233,8 +1231,6 @@ export default function UserManagement() {
               <DialogTitle>
                 {bulkAction === 'add_role' && 'Add Role to Selected Users'}
                 {bulkAction === 'remove_role' && 'Remove Role from Selected Users'}
-                {bulkAction === 'grant_permission' && 'Grant Permission to Selected Users'}
-                {bulkAction === 'revoke_permission' && 'Revoke Permission from Selected Users'}
               </DialogTitle>
               <DialogDescription>
                 This action will affect {selectedUsers.size} user(s)
@@ -1259,46 +1255,13 @@ export default function UserManagement() {
                   </Select>
                 </div>
               )}
-              {(bulkAction === 'grant_permission' || bulkAction === 'revoke_permission') && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Select Module</label>
-                    <Select value={bulkModule} onValueChange={setBulkModule}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a module" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {modules.map(m => (
-                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Permission Type</label>
-                    <Select value={bulkPermission} onValueChange={setBulkPermission}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Permissions</SelectItem>
-                        <SelectItem value="create">Create Only</SelectItem>
-                        <SelectItem value="read">Read Only</SelectItem>
-                        <SelectItem value="update">Update Only</SelectItem>
-                        <SelectItem value="delete">Delete Only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
             </div>
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
               <Button 
                 onClick={executeBulkAction}
                 disabled={
-                  ((bulkAction === 'add_role' || bulkAction === 'remove_role') && !bulkRole) ||
-                  ((bulkAction === 'grant_permission' || bulkAction === 'revoke_permission') && !bulkModule)
+                  (bulkAction === 'add_role' || bulkAction === 'remove_role') && !bulkRole
                 }
               >
                 Apply to {selectedUsers.size} Users

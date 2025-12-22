@@ -216,42 +216,42 @@ const TeacherDashboard = () => {
         studentsCount = students || 0;
       }
 
-        setStats({
-          myCourses: allCourses.length || 0,
-          totalLessons: lessonsCount,
-          totalStudents: studentsCount,
+      setStats({
+        myCourses: allCourses.length || 0,
+        totalLessons: lessonsCount,
+        totalStudents: studentsCount,
+      });
+
+      // Fetch detailed stats for each course (for charts)
+      if (allCourses && allCourses.length > 0) {
+        const courseStatsPromises = allCourses.slice(0, 5).map(async (course) => {
+          const [lessonsRes, studentsRes] = await Promise.all([
+            supabase
+              .from('lessons')
+              .select('id', { count: 'exact', head: true })
+              .eq('course_id', course.id),
+            supabase
+              .from('course_enrollments')
+              .select('id', { count: 'exact', head: true })
+              .eq('course_id', course.id)
+          ]);
+
+          return {
+            name: course.title.substring(0, 15) + (course.title.length > 15 ? '...' : ''),
+            students: studentsRes.count || 0,
+            lessons: lessonsRes.count || 0
+          };
         });
 
-        // Fetch detailed stats for each course (for charts)
-        if (allCourses && allCourses.length > 0) {
-          const courseStatsPromises = allCourses.slice(0, 5).map(async (course) => {
-            const [lessonsRes, studentsRes] = await Promise.all([
-              supabase
-                .from('lessons')
-                .select('id', { count: 'exact', head: true })
-                .eq('course_id', course.id),
-              supabase
-                .from('course_enrollments')
-                .select('id', { count: 'exact', head: true })
-                .eq('course_id', course.id)
-            ]);
-
-            return {
-              name: course.title.substring(0, 15) + (course.title.length > 15 ? '...' : ''),
-              students: studentsRes.count || 0,
-              lessons: lessonsRes.count || 0
-            };
-          });
-
-          const statsData = await Promise.all(courseStatsPromises);
-          setCourseStats(statsData);
-        }
-      } catch (error) {
-        console.error('Error fetching teacher data:', error);
-      } finally {
-        setLoadingData(false);
+        const statsData = await Promise.all(courseStatsPromises);
+        setCourseStats(statsData);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching teacher data:', error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   const fetchEnrolledStudents = async () => {
     try {

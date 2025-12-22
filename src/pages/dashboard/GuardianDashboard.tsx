@@ -1122,7 +1122,7 @@ const GuardianDashboard = () => {
                               <div className="text-center p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
                                 <div className="h-10 w-10 mx-auto rounded-lg bg-purple-500/20 flex items-center justify-center mb-2">
                                   <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                </div>
+                          </div>
                                 <p className="text-2xl font-bold text-foreground">{student.averageScore}%</p>
                                 <p className="text-xs text-muted-foreground font-medium">Avg Score</p>
                               </div>
@@ -1292,11 +1292,11 @@ const GuardianDashboard = () => {
                                                     <h4 className="font-bold text-lg text-foreground mb-1 group-hover:text-primary transition-colors">
                                                       {course.courseTitle}
                                                     </h4>
-                                                    {course.courseDescription && (
+                                              {course.courseDescription && (
                                                       <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                                                        {course.courseDescription}
-                                                      </p>
-                                                    )}
+                                                  {course.courseDescription}
+                                                </p>
+                                              )}
                                                   </div>
                                                 </div>
                                                 
@@ -1325,24 +1325,24 @@ const GuardianDashboard = () => {
                                                       Enrolled: {format(new Date(course.enrolledAt), 'MMM dd, yyyy')}
                                                     </span>
                                                   </div>
-                                                  {course.completedAt && (
+                                                {course.completedAt && (
                                                     <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
                                                       <CheckCircle2 className="h-3.5 w-3.5" />
                                                       <span className="font-medium">
                                                         Completed: {format(new Date(course.completedAt), 'MMM dd, yyyy')}
-                                                      </span>
+                                                  </span>
                                                     </div>
-                                                  )}
-                                                </div>
+                                                )}
+                                              </div>
 
                                                 {/* Teacher Info */}
-                                                {course.teacherName && (
+                                              {course.teacherName && (
                                                   <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
                                                     <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
                                                       <Users className="h-3.5 w-3.5" />
                                                       Course Teacher
                                                     </p>
-                                                    <div className="flex items-center gap-2 text-sm">
+                                                  <div className="flex items-center gap-2 text-sm">
                                                       <span className="font-medium text-blue-800 dark:text-blue-200">{course.teacherName}</span>
                                                       {course.teacherEmail && (
                                                         <a 
@@ -1353,11 +1353,11 @@ const GuardianDashboard = () => {
                                                           <Mail className="h-3 w-3" />
                                                           Contact
                                                         </a>
-                                                      )}
-                                                    </div>
+                                              )}
                                                   </div>
-                                                )}
-                                              </div>
+                                                </div>
+                                              )}
+                                            </div>
                                               
                                               {/* Status Badge */}
                                               <div className="flex flex-col items-end gap-2 shrink-0">
@@ -1366,12 +1366,12 @@ const GuardianDashboard = () => {
                                                     <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                                     Completed
                                                   </Badge>
-                                                ) : (
+                                              ) : (
                                                   <Badge variant="outline" className="border-blue-500/50 text-blue-700 dark:text-blue-300 px-3 py-1.5">
                                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                                     In Progress
                                                   </Badge>
-                                                )}
+                                              )}
                                                 <Badge variant="outline" className="text-xs border-muted-foreground/20 text-muted-foreground">
                                                   <Eye className="h-3 w-3 mr-1" />
                                                   View Only
@@ -1426,42 +1426,42 @@ const GuardianDashboard = () => {
                                                   {assignment.assignmentTitle}
                                                 </h4>
                                                 <p className="text-sm text-muted-foreground mb-2">{assignment.courseTitle}</p>
-                                              </div>
-                                              {assignment.score !== null ? (
+                                            </div>
+                                            {assignment.score !== null ? (
                                                 <div className="flex flex-col items-end gap-1 shrink-0">
                                                   <Badge className={`${badgeColor} text-white px-3 py-1.5`}>
-                                                    {assignment.score} / {assignment.maxScore}
-                                                  </Badge>
+                                                {assignment.score} / {assignment.maxScore}
+                                              </Badge>
                                                   <span className={`text-xs font-bold ${scoreColor}`}>
                                                     {percentage}%
                                                   </span>
                                                 </div>
-                                              ) : (
+                                            ) : (
                                                 <Badge variant="outline" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-300">
                                                   <Clock className="h-3.5 w-3.5 mr-1.5" />
                                                   Pending
                                                 </Badge>
-                                              )}
-                                            </div>
+                                            )}
+                                          </div>
                                             <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground mb-3">
-                                              {assignment.dueDate && (
+                                            {assignment.dueDate && (
                                                 <div className="flex items-center gap-1.5">
                                                   <Calendar className="h-3.5 w-3.5" />
                                                   <span>Due: {format(new Date(assignment.dueDate), 'MMM dd, yyyy')}</span>
                                                 </div>
-                                              )}
-                                              {assignment.submittedAt && (
+                                            )}
+                                            {assignment.submittedAt && (
                                                 <div className="flex items-center gap-1.5">
                                                   <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                                                   <span>Submitted: {format(new Date(assignment.submittedAt), 'MMM dd, yyyy')}</span>
                                                 </div>
-                                              )}
-                                              {assignment.gradedAt && (
+                                            )}
+                                            {assignment.gradedAt && (
                                                 <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
                                                   <Award className="h-3.5 w-3.5" />
                                                   <span>Graded: {format(new Date(assignment.gradedAt), 'MMM dd, yyyy')}</span>
                                                 </div>
-                                              )}
+                                            )}
                                             </div>
                                             {assignment.feedback && (
                                               <div className="mt-3 pt-3 border-t border-border/50">
@@ -1516,36 +1516,36 @@ const GuardianDashboard = () => {
                                                   {quiz.quizTitle}
                                                 </h4>
                                                 <p className="text-sm text-muted-foreground mb-2">{quiz.courseTitle}</p>
-                                              </div>
-                                              {quiz.score !== null ? (
+                                            </div>
+                                            {quiz.score !== null ? (
                                                 <div className="flex flex-col items-end gap-1 shrink-0">
                                                   <Badge className={`${badgeColor} text-white px-3 py-1.5`}>
-                                                    {quiz.score}% {quiz.passed ? '✓' : '✗'}
-                                                  </Badge>
+                                                {quiz.score}% {quiz.passed ? '✓' : '✗'}
+                                              </Badge>
                                                   <span className={`text-xs font-bold ${passedColor}`}>
                                                     {quiz.passed ? 'Passed' : 'Failed'}
                                                   </span>
                                                 </div>
-                                              ) : (
+                                            ) : (
                                                 <Badge variant="outline" className="border-gray-500/50 text-gray-700 dark:text-gray-300">
                                                   <Clock className="h-3.5 w-3.5 mr-1.5" />
                                                   Not Taken
                                                 </Badge>
-                                              )}
-                                            </div>
+                                            )}
+                                          </div>
                                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                               <div className="flex items-center gap-1.5">
                                                 <Target className="h-3.5 w-3.5" />
                                                 <span>Passing: {quiz.passingScore}%</span>
                                               </div>
-                                              {quiz.submittedAt && (
+                                            {quiz.submittedAt && (
                                                 <div className="flex items-center gap-1.5">
                                                   <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
                                                   <span>Submitted: {format(new Date(quiz.submittedAt), 'MMM dd, yyyy')}</span>
                                                 </div>
-                                              )}
-                                            </div>
+                                            )}
                                           </div>
+                                        </div>
                                         );
                                       })}
                                     </div>
@@ -1604,24 +1604,24 @@ const GuardianDashboard = () => {
                                         };
                                         const colors = statusColors[record.status];
                                         return (
-                                          <div 
-                                            key={record.id} 
+                                        <div 
+                                          key={record.id} 
                                             className={`flex items-center justify-between p-4 rounded-xl ${colors.bg} ${colors.border} border-2 hover:shadow-md transition-all duration-300`}
-                                          >
-                                            <div className="flex-1 min-w-0">
+                                        >
+                                          <div className="flex-1 min-w-0">
                                               <div className="flex items-center gap-2 mb-1">
                                                 <Calendar className={`h-4 w-4 ${colors.text}`} />
                                                 <p className="font-semibold text-sm text-foreground">
-                                                  {record.sessionTitle || 'Class Session'}
-                                                </p>
+                                              {record.sessionTitle || 'Class Session'}
+                                            </p>
                                               </div>
                                               <p className="text-xs text-muted-foreground mb-1">
-                                                {record.courseTitle}
-                                              </p>
+                                              {record.courseTitle}
+                                            </p>
                                               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                                 <span className="flex items-center gap-1">
                                                   <Calendar className="h-3 w-3" />
-                                                  {format(new Date(record.sessionDate), 'MMM dd, yyyy')}
+                                              {format(new Date(record.sessionDate), 'MMM dd, yyyy')}
                                                 </span>
                                                 {record.sessionTime && (
                                                   <span className="flex items-center gap-1">
@@ -1630,20 +1630,20 @@ const GuardianDashboard = () => {
                                                   </span>
                                                 )}
                                               </div>
-                                              {record.notes && (
+                                            {record.notes && (
                                                 <div className="mt-2 pt-2 border-t border-border/30">
                                                   <p className="text-xs text-muted-foreground italic">
                                                     <span className="font-medium">Note:</span> {record.notes}
-                                                  </p>
+                                              </p>
                                                 </div>
-                                              )}
-                                            </div>
-                                            <Badge 
-                                              className={`ml-3 shrink-0 ${colors.badge} text-white px-3 py-1.5`}
-                                            >
-                                              {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                                            </Badge>
+                                            )}
                                           </div>
+                                          <Badge 
+                                              className={`ml-3 shrink-0 ${colors.badge} text-white px-3 py-1.5`}
+                                          >
+                                            {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                                          </Badge>
+                                        </div>
                                         );
                                       })}
                                     </div>
@@ -1750,12 +1750,12 @@ const GuardianDashboard = () => {
                                               const passedColor = quiz.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
                                               const badgeColor = quiz.passed ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600';
                                               return (
-                                                <div 
-                                                  key={quiz.quizId} 
+                                              <div 
+                                                key={quiz.quizId} 
                                                   className="group p-4 rounded-xl border-2 border-border/50 hover:shadow-md hover:border-primary/20 transition-all duration-300 bg-gradient-to-br from-card/50 to-card/30"
-                                                >
+                                              >
                                                   <div className="flex items-start justify-between gap-4">
-                                                    <div className="flex-1 min-w-0">
+                                                  <div className="flex-1 min-w-0">
                                                       <h5 className="font-semibold text-sm text-foreground mb-1 group-hover:text-primary transition-colors truncate">
                                                         {quiz.quizTitle}
                                                       </h5>
@@ -1766,17 +1766,17 @@ const GuardianDashboard = () => {
                                                           Passing: {quiz.passingScore}%
                                                         </span>
                                                       </div>
-                                                    </div>
-                                                    <div className="ml-3 text-right shrink-0">
+                                                  </div>
+                                                  <div className="ml-3 text-right shrink-0">
                                                       <Badge className={`${badgeColor} text-white px-3 py-1.5 mb-1`}>
-                                                        {quiz.score}% {quiz.passed ? '✓' : '✗'}
-                                                      </Badge>
+                                                      {quiz.score}% {quiz.passed ? '✓' : '✗'}
+                                                    </Badge>
                                                       <p className={`text-xs font-bold ${passedColor}`}>
                                                         {quiz.passed ? 'Passed' : 'Failed'}
-                                                      </p>
-                                                    </div>
+                                                    </p>
                                                   </div>
                                                 </div>
+                                              </div>
                                               );
                                             })}
                                         </div>
@@ -1835,42 +1835,42 @@ const GuardianDashboard = () => {
                                                   {exam.examTitle}
                                                 </h4>
                                                 <p className="text-sm text-muted-foreground mb-2">{exam.courseTitle}</p>
-                                              </div>
-                                              {exam.score !== null ? (
+                                            </div>
+                                            {exam.score !== null ? (
                                                 <div className="flex flex-col items-end gap-1 shrink-0">
                                                   <Badge className={`${badgeColor} text-white px-3 py-1.5`}>
-                                                    {exam.score} / {exam.maxScore}
-                                                  </Badge>
+                                                {exam.score} / {exam.maxScore}
+                                              </Badge>
                                                   <span className={`text-xs font-bold ${scoreColor}`}>
                                                     {percentage}%
                                                   </span>
                                                 </div>
-                                              ) : (
+                                            ) : (
                                                 <Badge variant="outline" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-300">
                                                   <Clock className="h-3.5 w-3.5 mr-1.5" />
                                                   Pending
                                                 </Badge>
-                                              )}
-                                            </div>
+                                            )}
+                                          </div>
                                             <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground mb-3">
-                                              {exam.dueDate && (
+                                            {exam.dueDate && (
                                                 <div className="flex items-center gap-1.5">
                                                   <Calendar className="h-3.5 w-3.5" />
                                                   <span>Due: {format(new Date(exam.dueDate), 'MMM dd, yyyy')}</span>
                                                 </div>
-                                              )}
-                                              {exam.submittedAt && (
+                                            )}
+                                            {exam.submittedAt && (
                                                 <div className="flex items-center gap-1.5">
                                                   <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                                                   <span>Submitted: {format(new Date(exam.submittedAt), 'MMM dd, yyyy')}</span>
                                                 </div>
-                                              )}
-                                              {exam.gradedAt && (
+                                            )}
+                                            {exam.gradedAt && (
                                                 <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
                                                   <Award className="h-3.5 w-3.5" />
                                                   <span>Graded: {format(new Date(exam.gradedAt), 'MMM dd, yyyy')}</span>
                                                 </div>
-                                              )}
+                                            )}
                                             </div>
                                             {exam.feedback && (
                                               <div className="mt-3 pt-3 border-t border-border/50">
@@ -1924,9 +1924,9 @@ const GuardianDashboard = () => {
                                               }`}>
                                                 {isBook ? (
                                                   <Book className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                                ) : (
+                                            ) : (
                                                   <Video className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                                )}
+                                            )}
                                               </div>
                                               <div className="flex-1 min-w-0">
                                                 <p className="font-semibold text-sm text-foreground truncate">{item.title}</p>
@@ -1934,14 +1934,14 @@ const GuardianDashboard = () => {
                                                   <Badge variant="outline" className="text-xs">
                                                     {isBook ? 'Book' : 'Video'}
                                                   </Badge>
-                                                  {item.accessedAt && (
+                                                {item.accessedAt && (
                                                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                                                       <Clock className="h-3 w-3" />
                                                       {format(new Date(item.accessedAt), 'MMM dd, yyyy')}
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </div>
+                                                  </span>
+                                                )}
+                                            </div>
+                                          </div>
                                             </div>
                                             {item.progress !== undefined && item.progress > 0 && (
                                               <div className="text-right shrink-0 ml-4">
@@ -1952,10 +1952,10 @@ const GuardianDashboard = () => {
                                                 }`}>
                                                   {item.progress}%
                                                 </div>
-                                                <Progress value={item.progress} className="w-20 h-2 mt-1" />
-                                              </div>
-                                            )}
-                                          </div>
+                                              <Progress value={item.progress} className="w-20 h-2 mt-1" />
+                                            </div>
+                                          )}
+                                        </div>
                                         );
                                       })}
                                     </div>
@@ -2095,29 +2095,29 @@ const GuardianDashboard = () => {
                             <div className="text-center p-4 rounded-xl bg-blue-500/10 border-2 border-blue-500/20 hover:shadow-md transition-all">
                               <div className="h-10 w-10 mx-auto rounded-lg bg-blue-500/20 flex items-center justify-center mb-2">
                                 <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                              </div>
+                                  </div>
                               <p className="text-2xl font-bold text-foreground">{student.enrolledCourses}</p>
                               <p className="text-xs text-muted-foreground font-medium mt-1">Enrolled Courses</p>
-                            </div>
+                                </div>
                             <div className="text-center p-4 rounded-xl bg-green-500/10 border-2 border-green-500/20 hover:shadow-md transition-all">
                               <div className="h-10 w-10 mx-auto rounded-lg bg-green-500/20 flex items-center justify-center mb-2">
                                 <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                              </div>
+                                  </div>
                               <p className="text-2xl font-bold text-foreground">{student.completedCourses}</p>
                               <p className="text-xs text-muted-foreground font-medium mt-1">Completed</p>
-                            </div>
+                                </div>
                             <div className="text-center p-4 rounded-xl bg-yellow-500/10 border-2 border-yellow-500/20 hover:shadow-md transition-all">
                               <div className="h-10 w-10 mx-auto rounded-lg bg-yellow-500/20 flex items-center justify-center mb-2">
                                 <Trophy className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                              </div>
+                                  </div>
                               <p className="text-2xl font-bold text-foreground">{student.certificates}</p>
                               <p className="text-xs text-muted-foreground font-medium mt-1">Certificates</p>
-                            </div>
+                                </div>
                             {student.averageScore !== undefined && (
                               <div className="text-center p-4 rounded-xl bg-purple-500/10 border-2 border-purple-500/20 hover:shadow-md transition-all">
                                 <div className="h-10 w-10 mx-auto rounded-lg bg-purple-500/20 flex items-center justify-center mb-2">
                                   <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                </div>
+                              </div>
                                 <p className="text-2xl font-bold text-foreground">{student.averageScore}%</p>
                                 <p className="text-xs text-muted-foreground font-medium mt-1">Avg Score</p>
                               </div>

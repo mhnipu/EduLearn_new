@@ -347,17 +347,30 @@ export const Navbar = () => {
                       <div className="py-2">
                         <DropdownMenuGroup>
                           {role === 'super_admin' && (
-                            <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
-                              <Link to="/admin/super" className="flex items-center w-full py-2">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-100 dark:bg-purple-900/30 mr-3">
-                                  <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                </div>
-                                <span className="flex-1 text-sm font-medium">Super Admin</span>
-                                {isActiveRoute('/admin/super') && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                                )}
-                              </Link>
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                                <Link to="/admin/super" className="flex items-center w-full py-2">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-100 dark:bg-purple-900/30 mr-3">
+                                    <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                  </div>
+                                  <span className="flex-1 text-sm font-medium">Super Admin</span>
+                                  {isActiveRoute('/admin/super') && (
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                  )}
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
+                                <Link to="/admin/role-permissions" className="flex items-center w-full py-2">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-indigo-100 dark:bg-indigo-900/30 mr-3">
+                                    <Shield className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                                  </div>
+                                  <span className="flex-1 text-sm font-medium">Role Permissions</span>
+                                  {isActiveRoute('/admin/role-permissions') && (
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                  )}
+                                </Link>
+                              </DropdownMenuItem>
+                            </>
                           )}
                           <DropdownMenuItem asChild className="mx-2 my-1 rounded-lg hover:bg-primary/10 transition-all duration-200 cursor-pointer">
                             <Link to="/admin/users" className="flex items-center w-full py-2">

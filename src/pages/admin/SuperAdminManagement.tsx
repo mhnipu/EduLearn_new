@@ -61,11 +61,15 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  Upload
+  Upload,
+  Save,
+  AlertCircle,
+  Filter
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   PieChart, Pie, Cell,
@@ -220,6 +224,26 @@ export default function SuperAdminManagement() {
   const [newCustomRole, setNewCustomRole] = useState('');
   const [isCreatingRole, setIsCreatingRole] = useState(false);
 
+  // Role Permission Management states
+  const [rolesData, setRolesData] = useState<Record<string, {
+    role: string;
+    permissions: Record<string, {
+      module_id: string;
+      module_name: string;
+      can_create: boolean;
+      can_read: boolean;
+      can_update: boolean;
+      can_delete: boolean;
+      can_assign: boolean;
+      can_approve: boolean;
+    }>;
+    userCount: number;
+  }>>({});
+  const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<string>('super_admin');
+  const [hasPermissionChanges, setHasPermissionChanges] = useState(false);
+  const [rolePermissionModuleSearch, setRolePermissionModuleSearch] = useState('');
+  const [rolePermissionModuleFilter, setRolePermissionModuleFilter] = useState<string>('all');
+
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
@@ -241,7 +265,8 @@ export default function SuperAdminManagement() {
       fetchModules(), 
       fetchSystemStats(),
       fetchRecentActivity(),
-      fetchCustomRoles()
+      fetchCustomRoles(),
+      fetchRolePermissions()
     ]);
     setIsLoading(false);
   };
@@ -441,6 +466,204 @@ export default function SuperAdminManagement() {
     }
   };
 
+  const fetchRolePermissions = async () => {
+    try {
+      const rolesToFetch = [...SUPER_ADMIN_ROLES, ...customRoles];
+      const rolesPermissions: Record<string, {
+        role: string;
+        permissions: Record<string, any>;
+        userCount: number;
+      }> = {};
+
+      // Initialize all roles
+      for (const roleName of rolesToFetch) {
+        rolesPermissions[roleName] = {
+          role: roleName,
+          permissions: {},
+          userCount: 0,
+        };
+      }
+
+      // Fetch role permissions
+      const { data: rolePerms, error: permsError } = await supabase
+        .from('role_module_permissions')
+        .select(`
+          role,
+          module_id,
+          can_create,
+          can_read,
+          can_update,
+          can_delete,
+          can_assign,
+          can_approve,
+          modules!inner(name)
+        `);
+
+      if (permsError) throw permsError;
+
+      // Process role permissions
+      (rolePerms || []).forEach((rp: any) => {
+        if (!rolesPermissions[rp.role]) {
+          rolesPermissions[rp.role] = {
+            role: rp.role,
+            permissions: {},
+            userCount: 0,
+          };
+        }
+        rolesPermissions[rp.role].permissions[rp.module_id] = {
+          module_id: rp.module_id,
+          module_name: rp.modules.name,
+          can_create: rp.can_create || false,
+          can_read: rp.can_read || false,
+          can_update: rp.can_update || false,
+          can_delete: rp.can_delete || false,
+          can_assign: rp.can_assign || false,
+          can_approve: rp.can_approve || false,
+        };
+      });
+
+      // Fetch user counts for each role
+      const { data: userRoles, error: userRolesError } = await supabase
+        .from('user_roles')
+        .select('role');
+
+      if (!userRolesError && userRoles) {
+        const roleCounts: Record<string, number> = {};
+        userRoles.forEach(ur => {
+          roleCounts[ur.role] = (roleCounts[ur.role] || 0) + 1;
+        });
+        Object.keys(rolesPermissions).forEach(roleName => {
+          rolesPermissions[roleName].userCount = roleCounts[roleName] || 0;
+        });
+      }
+
+      setRolesData(rolesPermissions);
+    } catch (error) {
+      console.error('Error fetching role permissions:', error);
+    }
+  };
+
+  const toggleRolePermission = (
+    roleName: string,
+    moduleId: string,
+    permission: 'can_create' | 'can_read' | 'can_update' | 'can_delete' | 'can_assign' | 'can_approve'
+  ) => {
+    setRolesData(prev => {
+      const updated = { ...prev };
+      if (!updated[roleName]) {
+        updated[roleName] = {
+          role: roleName,
+          permissions: {},
+          userCount: 0,
+        };
+      }
+      if (!updated[roleName].permissions[moduleId]) {
+        const module = modules.find(m => m.id === moduleId);
+        updated[roleName].permissions[moduleId] = {
+          module_id: moduleId,
+          module_name: module?.name || '',
+          can_create: false,
+          can_read: false,
+          can_update: false,
+          can_delete: false,
+          can_assign: false,
+          can_approve: false,
+        };
+      }
+      updated[roleName].permissions[moduleId][permission] = 
+        !updated[roleName].permissions[moduleId][permission];
+      setHasPermissionChanges(true);
+      return updated;
+    });
+  };
+
+  const saveRolePermissions = async (roleName?: string) => {
+    try {
+      // If roleName is provided, save only that role; otherwise save all roles
+      const rolesToSave = roleName ? [roleName] : Object.keys(rolesData);
+      
+      for (const roleToSave of rolesToSave) {
+        const roleData = rolesData[roleToSave];
+        if (!roleData) continue;
+
+        // Save or update each module permission
+        for (const [moduleId, perm] of Object.entries(roleData.permissions)) {
+          const { error } = await supabase
+            .from('role_module_permissions')
+            .upsert({
+              role: roleToSave,
+              module_id: moduleId,
+              can_create: perm.can_create,
+              can_read: perm.can_read,
+              can_update: perm.can_update,
+              can_delete: perm.can_delete,
+              can_assign: perm.can_assign || false,
+              can_approve: perm.can_approve || false,
+            }, {
+              onConflict: 'role,module_id'
+            });
+
+          if (error) throw error;
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: roleName 
+          ? `Permissions for ${roleName.replace('_', ' ')} role saved successfully`
+          : `Permissions for all roles saved successfully`,
+      });
+
+      setHasPermissionChanges(false);
+      await fetchRolePermissions();
+      // Refresh permission matrix to reflect changes
+      await fetchPermissionMatrix(users);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save permissions',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const setAllRolePermissions = (roleName: string, moduleId: string, grant: boolean) => {
+    setRolesData(prev => {
+      const updated = { ...prev };
+      if (!updated[roleName]) {
+        updated[roleName] = {
+          role: roleName,
+          permissions: {},
+          userCount: 0,
+        };
+      }
+      if (!updated[roleName].permissions[moduleId]) {
+        const module = modules.find(m => m.id === moduleId);
+        updated[roleName].permissions[moduleId] = {
+          module_id: moduleId,
+          module_name: module?.name || '',
+          can_create: false,
+          can_read: false,
+          can_update: false,
+          can_delete: false,
+          can_assign: false,
+          can_approve: false,
+        };
+      }
+      updated[roleName].permissions[moduleId] = {
+        ...updated[roleName].permissions[moduleId],
+        can_create: grant,
+        can_read: grant,
+        can_update: grant,
+        can_delete: grant,
+        can_assign: grant,
+        can_approve: grant,
+      };
+      setHasPermissionChanges(true);
+      return updated;
+    });
+  };
+
   const fetchPermissionMatrix = async (usersList: UserWithRoles[]) => {
     try {
       const { data: allPermissions, error } = await supabase
@@ -562,39 +785,19 @@ export default function SuperAdminManagement() {
     }
   };
 
+  // DEPRECATED: User-level permission editing removed in pure RBAC system
+  // Permissions are now managed at the role level via Role Permission Management page
   const updatePermission = async (
     moduleId: string,
     field: 'can_create' | 'can_read' | 'can_update' | 'can_delete',
     value: boolean
   ) => {
-    if (!selectedUser) return;
-    try {
-      const { data: existing } = await supabase
-        .from('user_module_permissions')
-        .select('id')
-        .eq('user_id', selectedUser.id)
-        .eq('module_id', moduleId)
-        .single();
-
-      if (existing) {
-        const { error } = await supabase
-          .from('user_module_permissions')
-          .update({ [field]: value })
-          .eq('user_id', selectedUser.id)
-          .eq('module_id', moduleId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('user_module_permissions')
-          .insert({ user_id: selectedUser.id, module_id: moduleId, [field]: value });
-        if (error) throw error;
-      }
-
-      setUserPermissions((prev) => prev.map((p) => (p.module_id === moduleId ? { ...p, [field]: value } : p)));
-      toast({ title: 'Permission Updated' });
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to update permission', variant: 'destructive' });
-    }
+    toast({ 
+      title: 'Permission Management Changed', 
+      description: 'Permissions are now managed at the role level. Please use Role Permission Management to update role permissions.',
+      variant: 'default'
+    });
+    navigate('/admin/role-permissions');
   };
 
   const setAllPermissions = async (moduleId: string, grant: boolean) => {
@@ -1063,6 +1266,13 @@ export default function SuperAdminManagement() {
               <Settings className="h-4 w-4" />
               Permissions Matrix
             </TabsTrigger>
+            <TabsTrigger 
+              value="role-permissions" 
+              className="flex items-center gap-2 data-[state=active]:bg-background"
+            >
+              <Shield className="h-4 w-4" />
+              Role Permissions
+            </TabsTrigger>
           </TabsList>
 
           {/* Users & Roles Tab */}
@@ -1073,7 +1283,7 @@ export default function SuperAdminManagement() {
                   <div>
                     <CardTitle>User Role Management</CardTitle>
                     <CardDescription>
-                      Assign roles and configure module permissions for users
+                      Assign roles to users. Permissions are managed at the role level via Role Permission Management.
                     </CardDescription>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -1206,9 +1416,17 @@ export default function SuperAdminManagement() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => openPermissionsDialog(userItem)}
-                                  title="View permissions (read-only)"
+                                  title="View effective permissions (read-only)"
                                 >
-                                  <Settings className="h-4 w-4" />
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => navigate('/admin/role-permissions')}
+                                  title="Manage Role Permissions"
+                                >
+                                  <Shield className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   size="sm"
@@ -1465,6 +1683,315 @@ export default function SuperAdminManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Role Permissions Tab */}
+          <TabsContent value="role-permissions">
+            <Card className="border-border">
+              <CardHeader className="border-b border-border">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-primary" />
+                        Role Permission Management
+                      </CardTitle>
+                      <CardDescription className="mt-2">
+                        Manage module permissions for each role. All users with the same role will have identical permissions.
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={fetchRolePermissions} variant="outline">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Refresh
+                      </Button>
+                      <Button 
+                        onClick={() => saveRolePermissions()}
+                        disabled={!hasPermissionChanges}
+                        className="gap-2"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save All Changes
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Filters */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search modules..."
+                        value={rolePermissionModuleSearch}
+                        onChange={(e) => setRolePermissionModuleSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <Select value={rolePermissionModuleFilter} onValueChange={setRolePermissionModuleFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Filter module" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Modules</SelectItem>
+                        {modules.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Alert className="m-6 mb-0">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Important:</strong> This is a pure role-based permission system. 
+                    Permissions are assigned to roles, and all users with the same role inherit the same permissions. 
+                    Changes to role permissions affect all users with that role immediately.
+                  </AlertDescription>
+                </Alert>
+
+                <ScrollArea className="h-[550px] mt-6">
+                  <div className="min-w-max">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-20">
+                        <TableRow className="hover:bg-transparent bg-muted/80 backdrop-blur-sm">
+                          <TableHead className="sticky left-0 z-30 min-w-[250px] border-r bg-muted/80 backdrop-blur-sm">
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-4 w-4" />
+                              Role Information
+                            </div>
+                          </TableHead>
+                          {(rolePermissionModuleFilter === 'all' 
+                            ? modules.filter(m => 
+                                m.name.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()) ||
+                                m.description?.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase())
+                              )
+                            : modules.filter(m => 
+                                m.id === rolePermissionModuleFilter &&
+                                (m.name.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()) ||
+                                m.description?.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()))
+                              )
+                          ).map(m => (
+                            <TableHead key={m.id} className="text-center min-w-[200px] px-3 bg-muted/80 backdrop-blur-sm">
+                              <div className="flex flex-col items-center gap-1.5">
+                                <Badge variant="outline" className="font-medium">
+                                  {m.name}
+                                </Badge>
+                                <div className="flex gap-1 text-[10px] font-medium text-muted-foreground">
+                                  <span className="w-6 text-center bg-muted rounded px-1" title="Create">C</span>
+                                  <span className="w-6 text-center bg-muted rounded px-1" title="Read">R</span>
+                                  <span className="w-6 text-center bg-muted rounded px-1" title="Update">U</span>
+                                  <span className="w-6 text-center bg-muted rounded px-1" title="Delete">D</span>
+                                  <span className="w-6 text-center bg-muted rounded px-1" title="Assign">As</span>
+                                  <span className="w-6 text-center bg-muted rounded px-1" title="Approve">Ap</span>
+                                </div>
+                              </div>
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {SUPER_ADMIN_ROLES.map(roleName => {
+                          const roleData = rolesData[roleName] || {
+                            role: roleName,
+                            permissions: {},
+                            userCount: 0,
+                          };
+
+                          // Calculate total permission count for this role
+                          const totalPermCount = modules.reduce((count, m) => {
+                            const perm = roleData.permissions[m.id];
+                            if (perm) {
+                              return count + [
+                                perm.can_create, 
+                                perm.can_read, 
+                                perm.can_update, 
+                                perm.can_delete, 
+                                perm.can_assign, 
+                                perm.can_approve
+                              ].filter(Boolean).length;
+                            }
+                            return count;
+                          }, 0);
+
+                          return (
+                            <TableRow key={roleName} className="group hover:bg-muted/30 transition-colors">
+                              <TableCell className="sticky left-0 z-10 border-r min-w-[250px] bg-background group-hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 ring-2 ring-border">
+                                    <Shield className={`h-5 w-5 ${ROLE_COLORS[roleName]?.text || 'text-primary'}`} />
+                                  </div>
+                                  
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Badge className={`${ROLE_COLORS[roleName]?.bg} ${ROLE_COLORS[roleName]?.text} border ${ROLE_COLORS[roleName]?.border} text-xs`}>
+                                        {roleName.replace('_', ' ').toUpperCase()}
+                                      </Badge>
+                                      {roleData.userCount > 0 && (
+                                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-5">
+                                          {roleData.userCount} {roleData.userCount === 1 ? 'user' : 'users'}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 mt-1.5">
+                                      <Badge variant={totalPermCount > 0 ? 'default' : 'outline'} className="text-[10px] py-0 h-5">
+                                        <Shield className="h-3 w-3 mr-1" />
+                                        {totalPermCount} perms
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              {(rolePermissionModuleFilter === 'all' 
+                                ? modules.filter(m => 
+                                    m.name.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()) ||
+                                    m.description?.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase())
+                                  )
+                                : modules.filter(m => 
+                                    m.id === rolePermissionModuleFilter &&
+                                    (m.name.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()) ||
+                                    m.description?.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()))
+                                  )
+                              ).map(module => {
+                                const perm = roleData.permissions[module.id] || {
+                                  module_id: module.id,
+                                  module_name: module.name,
+                                  can_create: false,
+                                  can_read: false,
+                                  can_update: false,
+                                  can_delete: false,
+                                  can_assign: false,
+                                  can_approve: false,
+                                };
+
+                                const permCount = [
+                                  perm.can_create, 
+                                  perm.can_read, 
+                                  perm.can_update, 
+                                  perm.can_delete, 
+                                  perm.can_assign, 
+                                  perm.can_approve
+                                ].filter(Boolean).length;
+
+                                return (
+                                  <TableCell key={module.id} className="text-center px-3">
+                                    <div className="flex flex-col items-center gap-2">
+                                      {/* Permission Icons with Checkboxes */}
+                                      <TooltipProvider>
+                                        <div className="flex flex-wrap justify-center gap-1">
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleRolePermission(roleName, module.id, 'can_create')}
+                                                className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:opacity-80 cursor-pointer ${
+                                                  perm.can_create ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground/50'
+                                                }`}
+                                              >
+                                                <Plus className="h-3.5 w-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Create</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleRolePermission(roleName, module.id, 'can_read')}
+                                                className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:opacity-80 cursor-pointer ${
+                                                  perm.can_read ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground/50'
+                                                }`}
+                                              >
+                                                <Eye className="h-3.5 w-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Read</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleRolePermission(roleName, module.id, 'can_update')}
+                                                className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:opacity-80 cursor-pointer ${
+                                                  perm.can_update ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground/50'
+                                                }`}
+                                              >
+                                                <Edit className="h-3.5 w-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Update</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleRolePermission(roleName, module.id, 'can_delete')}
+                                                className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:opacity-80 cursor-pointer ${
+                                                  perm.can_delete ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground/50'
+                                                }`}
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Delete</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleRolePermission(roleName, module.id, 'can_assign')}
+                                                className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:opacity-80 cursor-pointer ${
+                                                  perm.can_assign ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground/50'
+                                                }`}
+                                              >
+                                                <Users className="h-3.5 w-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Assign</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleRolePermission(roleName, module.id, 'can_approve')}
+                                                className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:opacity-80 cursor-pointer ${
+                                                  perm.can_approve ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground/50'
+                                                }`}
+                                              >
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Approve</TooltipContent>
+                                          </Tooltip>
+                                        </div>
+                                      </TooltipProvider>
+                                      
+                                      {/* Permission Level Badge */}
+                                      <PermissionLevel permissions={{
+                                        can_create: perm.can_create,
+                                        can_read: perm.can_read,
+                                        can_update: perm.can_update,
+                                        can_delete: perm.can_delete
+                                      }} />
+                                      <span className={`text-[10px] ${permCount === 6 ? 'text-primary font-medium' : permCount > 0 ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>
+                                        {permCount}/6
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* User Details Dialog */}
@@ -1637,12 +2164,33 @@ export default function SuperAdminManagement() {
                   </span>
                 </div>
                 <div>
-                  <p>Module Permissions</p>
+                  <p className="flex items-center gap-2">
+                    <Eye className="h-4 w-4" />
+                    Effective Permissions
+                  </p>
                   <p className="text-sm font-normal text-muted-foreground">{selectedUser?.full_name}</p>
                 </div>
               </DialogTitle>
               <DialogDescription>
-                View CRUD (Create, Read, Update, Delete) permissions for each module (Read-only)
+                <div className="space-y-2">
+                  <p>Viewing effective permissions derived from user roles (Read-only)</p>
+                  {selectedUser && selectedUser.roles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <span className="text-xs font-medium">Roles:</span>
+                      {selectedUser.roles.map(role => (
+                        <Badge key={role} variant="secondary" className="capitalize">
+                          {role.replace('_', ' ')}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Permissions are managed at the role level. To change permissions, update the role permissions.
+                    </p>
+                  </div>
+                </div>
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-1 mt-4">
@@ -1731,6 +2279,18 @@ export default function SuperAdminManagement() {
                 </TableBody>
               </Table>
             </ScrollArea>
+            <div className="flex justify-between items-center pt-4 border-t mt-4">
+              <p className="text-sm text-muted-foreground">
+                These permissions are inherited from the user's roles
+              </p>
+              <Button onClick={() => {
+                setIsPermissionsDialogOpen(false);
+                navigate('/admin/role-permissions');
+              }}>
+                <Shield className="h-4 w-4 mr-2" />
+                Manage Role Permissions
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

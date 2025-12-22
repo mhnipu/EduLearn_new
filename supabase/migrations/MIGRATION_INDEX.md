@@ -265,12 +265,13 @@ These migrations are **essential** and should be applied:
 - **041**: Assessment system enhancements
 - **042**: Fix assignment submission RLS
 
-### Security & RLS Fixes (5 migrations)
+### Security & RLS Fixes (6 migrations)
 - **018**: Security definer view fix
 - **024**: RBAC enforcement
 - **032**: Unified permission system
 - **043**: Fix storage submissions policy
 - **047**: Fix avatar upload policy
+- **048**: ⚠️ **CRITICAL**: Fix RBAC to pure role-based system (permissions from roles only, removes user-level permission assignments)
 
 ---
 
@@ -311,6 +312,7 @@ Some migrations depend on others. Always run in **numerical order** to satisfy d
 - **029** requires **006** (modules table)
 - **024** requires **014** (custom roles)
 - Guardian migrations (043-046) require **038** (relationships)
+- **048** requires **029** and **032** (role-based permissions system must exist first)
 
 ---
 
@@ -332,7 +334,8 @@ After running all migrations, verify the following:
 ### Database Functions
 - [ ] **~30+ functions** in Database → Functions
 - [ ] `has_role` function exists
-- [ ] `has_module_permission` function exists
+- [ ] `has_module_permission` function exists (now role-based only, from 048)
+- [ ] `get_user_effective_permissions` function exists (from 048)
 - [ ] `is_user_enrolled_in_course` function exists
 - [ ] `is_teacher_assigned_to_course` function exists
 - [ ] `is_guardian_has_student_enrolled_in_course` function exists (from 046)
@@ -441,6 +444,13 @@ ORDER BY table_name;
 
 ---
 
+### RBAC System Fix (048)
+| # | File | Description | Status |
+|---|------|-------------|--------|
+| 048 | `048_fix_rbac_pure_role_based.sql` | ⚠️ **CRITICAL**: Fixes RBAC to pure role-based system (permissions from roles only) |
+
+---
+
 ## 🎉 Quick Reference
 
 ### Apply All Migrations (Automated)
@@ -450,13 +460,48 @@ ORDER BY table_name;
 
 ### Apply Critical Migrations Only
 Execute these in order:
-- 018, 019, 024, 028, 029, 032
+- 018, 019, 024, 028, 029, 032, **048**
 
 ### Verify After Migration
 ```sql
 SELECT COUNT(*) FROM information_schema.tables 
 WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
 -- Should return ~37
+```
+
+### Verify RBAC Fix (Migration 048)
+```sql
+-- Check that get_user_effective_permissions function exists
+SELECT routine_name FROM information_schema.routines 
+WHERE routine_name = 'get_user_effective_permissions';
+-- Should return 1 row
+
+-- Verify has_module_permission uses role permissions only
+SELECT pg_get_functiondef(oid) FROM pg_proc 
+WHERE proname = 'has_module_permission';
+-- Should show role_module_permissions check, NOT user_module_permissions
+
+-- Test: Two users with same role should have same permissions
+-- 1. Create Teacher_1, assign Teacher role, grant role permissions
+-- 2. Create Teacher_2, assign same Teacher role (no separate permissions)
+-- 3. Both should have identical effective permissions from roles
+SELECT 
+  u.id,
+  u.email,
+  r.role,
+  rmp.module_id,
+  m.name as module_name,
+  rmp.can_read,
+  rmp.can_create,
+  rmp.can_update,
+  rmp.can_delete
+FROM auth.users u
+JOIN public.user_roles r ON r.user_id = u.id
+JOIN public.role_module_permissions rmp ON rmp.role = r.role::text
+JOIN public.modules m ON m.id = rmp.module_id
+WHERE r.role = 'teacher'
+ORDER BY u.email, m.name;
+-- Both Teacher_1 and Teacher_2 should show same permissions
 ```
 
 ---

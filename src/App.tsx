@@ -34,6 +34,7 @@ import AttendanceManagement from "./pages/teacher/AttendanceManagement";
 import PendingApproval from "./pages/PendingApproval";
 import SuperAdminManagement from "./pages/admin/SuperAdminManagement";
 import SystemMonitoring from "./pages/admin/SystemMonitoring";
+import RolePermissionManagement from "./pages/admin/RolePermissionManagement";
 import EnrollmentManagement from "./pages/admin/EnrollmentManagement";
 import CourseModules from "./pages/admin/CourseModules";
 import CourseWizard from "./pages/admin/CourseWizard";
@@ -186,6 +187,11 @@ const App = () => (
               <Route path="/admin/super" element={
                 <ProtectedRoute requiredRole="super_admin">
                   <SuperAdminManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/role-permissions" element={
+                <ProtectedRoute requiredRole="super_admin">
+                  <RolePermissionManagement />
                 </ProtectedRoute>
               } />
               <Route path="/admin/site-content" element={

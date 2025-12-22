@@ -290,7 +290,7 @@ export default function CategoryManagement() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Icon</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead className="sticky left-0 z-30 bg-muted/80 backdrop-blur-sm border-r">Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -300,7 +300,7 @@ export default function CategoryManagement() {
                 {filteredCategories.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell className="text-2xl">{category.icon || '📚'}</TableCell>
-                    <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell className="sticky left-0 z-10 bg-background border-r font-medium">{category.name}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {category.description || '—'}
                     </TableCell>

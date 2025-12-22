@@ -967,7 +967,7 @@ const StudentManagement = () => {
                 <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="bg-course-detail/20 hover:bg-course-detail/30">
-                      <TableHead className="font-semibold text-xs uppercase tracking-wider">Student</TableHead>
+                      <TableHead className="sticky left-0 z-30 font-semibold text-xs uppercase tracking-wider bg-course-detail/20 border-r">Student</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider">Contact</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider">Guardian</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider">Enrollment Date</TableHead>
@@ -979,7 +979,7 @@ const StudentManagement = () => {
                   <TableBody>
                     {filteredStudents.map((student) => (
                       <TableRow key={`${student.id}-${student.course_id}`} className="hover:bg-course-detail/10 transition-colors border-b border-border/50">
-                        <TableCell className="min-w-[200px]">
+                        <TableCell className="sticky left-0 z-10 min-w-[200px] bg-background border-r">
                           <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10 border-2 border-course-detail/30">
                               <AvatarImage src={student.avatar_url || undefined} />

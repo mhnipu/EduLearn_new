@@ -7,14 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { ParentTable, ColumnDef } from '@/components/ui/parent-table';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Shield, 
@@ -35,6 +28,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BackButton } from '@/components/BackButton';
 
 type Module = {
   id: string;
@@ -133,6 +127,12 @@ export default function RolePermissionManagement() {
       fetchData();
     }
   }, [role]);
+
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RolePermissionManagement.tsx:135',message:'Component mounted',data:{hasNavigate:!!navigate,currentPath:window.location.pathname},timestamp:Date.now(),sessionId:'debug-session',runId:'navigation',hypothesisId:'A'})}).catch(()=>{});
+  }, [navigate]);
+  // #endregion
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -378,14 +378,20 @@ export default function RolePermissionManagement() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Shield className="h-8 w-8" />
-            Role Permission Management
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Manage module permissions for each role. All users with the same role will have identical permissions.
-          </p>
+        <div className="flex items-center gap-4">
+          <BackButton 
+            fallbackPath="/admin/users" 
+            fallbackLabel="Back to User Management"
+          />
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Shield className="h-8 w-8" />
+              Role Permission Management
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Manage module permissions for each role. All users with the same role will have identical permissions.
+            </p>
+          </div>
         </div>
         <Button onClick={fetchData} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -471,119 +477,142 @@ export default function RolePermissionManagement() {
                     />
                   </div>
 
-                  <ScrollArea className="h-[600px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[200px]">Module</TableHead>
-                          <TableHead className="text-center">Create</TableHead>
-                          <TableHead className="text-center">Read</TableHead>
-                          <TableHead className="text-center">Update</TableHead>
-                          <TableHead className="text-center">Delete</TableHead>
-                          <TableHead className="text-center">Assign</TableHead>
-                          <TableHead className="text-center">Approve</TableHead>
-                          <TableHead className="text-right">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="text-xs text-muted-foreground cursor-help">All</span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Toggle all permissions for module</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredModules.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={8} className="text-center text-muted-foreground">
-                              No modules found
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredModules.map(module => {
-                            const perm = roleData.permissions[module.id] || {
-                              module_id: module.id,
-                              module_name: module.name,
-                              can_create: false,
-                              can_read: false,
-                              can_update: false,
-                              can_delete: false,
-                              can_assign: false,
-                              can_approve: false,
-                            };
+                  <ParentTable
+                    columns={[
+                      {
+                        id: 'module',
+                        header: 'Module',
+                        sticky: 'left',
+                        minWidth: 250,
+                        cell: (row) => (
+                          <div>
+                            <div className="font-medium">{row.module.name}</div>
+                            {row.module.description && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {row.module.description}
+                              </div>
+                            )}
+                          </div>
+                        ),
+                      },
+                      {
+                        id: 'create',
+                        header: 'Create',
+                        align: 'center',
+                        minWidth: 100,
+                        cellType: 'checkbox',
+                        checkboxProps: (row) => ({
+                          checked: row.permission.can_create,
+                          onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_create'),
+                        }),
+                      },
+                      {
+                        id: 'read',
+                        header: 'Read',
+                        align: 'center',
+                        minWidth: 100,
+                        cellType: 'checkbox',
+                        checkboxProps: (row) => ({
+                          checked: row.permission.can_read,
+                          onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_read'),
+                        }),
+                      },
+                      {
+                        id: 'update',
+                        header: 'Update',
+                        align: 'center',
+                        minWidth: 100,
+                        cellType: 'checkbox',
+                        checkboxProps: (row) => ({
+                          checked: row.permission.can_update,
+                          onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_update'),
+                        }),
+                      },
+                      {
+                        id: 'delete',
+                        header: 'Delete',
+                        align: 'center',
+                        minWidth: 100,
+                        cellType: 'checkbox',
+                        checkboxProps: (row) => ({
+                          checked: row.permission.can_delete,
+                          onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_delete'),
+                        }),
+                      },
+                      {
+                        id: 'assign',
+                        header: 'Assign',
+                        align: 'center',
+                        minWidth: 100,
+                        cellType: 'checkbox',
+                        checkboxProps: (row) => ({
+                          checked: row.permission.can_assign || false,
+                          onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_assign'),
+                        }),
+                      },
+                      {
+                        id: 'approve',
+                        header: 'Approve',
+                        align: 'center',
+                        minWidth: 100,
+                        cellType: 'checkbox',
+                        checkboxProps: (row) => ({
+                          checked: row.permission.can_approve || false,
+                          onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_approve'),
+                        }),
+                      },
+                      {
+                        id: 'all',
+                        header: (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-xs text-muted-foreground cursor-help">All</span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Toggle all permissions for module</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ),
+                        align: 'right',
+                        minWidth: 120,
+                        cellType: 'button',
+                        buttonProps: (row) => ({
+                          onClick: () => setAllPermissions(roleName, row.module.id, !row.allGranted),
+                          children: row.allGranted ? 'Clear' : 'Grant All',
+                          variant: 'ghost' as const,
+                          size: 'sm' as const,
+                        }),
+                      },
+                    ]}
+                    data={filteredModules.map(module => {
+                      const perm = roleData.permissions[module.id] || {
+                        module_id: module.id,
+                        module_name: module.name,
+                        can_create: false,
+                        can_read: false,
+                        can_update: false,
+                        can_delete: false,
+                        can_assign: false,
+                        can_approve: false,
+                      };
 
-                            const allGranted = perm.can_create && perm.can_read && 
-                                              perm.can_update && perm.can_delete && 
-                                              perm.can_assign && perm.can_approve;
+                      const allGranted = perm.can_create && perm.can_read && 
+                                        perm.can_update && perm.can_delete && 
+                                        perm.can_assign && perm.can_approve;
 
-                            return (
-                              <TableRow key={module.id}>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{module.name}</div>
-                                    {module.description && (
-                                      <div className="text-xs text-muted-foreground mt-1">
-                                        {module.description}
-                                      </div>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Checkbox
-                                    checked={perm.can_create}
-                                    onCheckedChange={() => togglePermission(roleName, module.id, 'can_create')}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Checkbox
-                                    checked={perm.can_read}
-                                    onCheckedChange={() => togglePermission(roleName, module.id, 'can_read')}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Checkbox
-                                    checked={perm.can_update}
-                                    onCheckedChange={() => togglePermission(roleName, module.id, 'can_update')}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Checkbox
-                                    checked={perm.can_delete}
-                                    onCheckedChange={() => togglePermission(roleName, module.id, 'can_delete')}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Checkbox
-                                    checked={perm.can_assign || false}
-                                    onCheckedChange={() => togglePermission(roleName, module.id, 'can_assign')}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Checkbox
-                                    checked={perm.can_approve || false}
-                                    onCheckedChange={() => togglePermission(roleName, module.id, 'can_approve')}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setAllPermissions(roleName, module.id, !allGranted)}
-                                  >
-                                    {allGranted ? 'Clear' : 'Grant All'}
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                      return {
+                        module,
+                        permission: perm,
+                        allGranted,
+                      };
+                    })}
+                    emptyState={
+                      <p className="text-center">No modules found</p>
+                    }
+                    scrollHeight="h-[600px]"
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

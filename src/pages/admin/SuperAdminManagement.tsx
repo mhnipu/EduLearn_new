@@ -7,14 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { ParentTable } from '@/components/ui/parent-table';
 import {
   Dialog,
   DialogContent,
@@ -63,8 +56,7 @@ import {
   CheckCircle2,
   Upload,
   Save,
-  AlertCircle,
-  Filter
+  AlertCircle
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -185,6 +177,9 @@ const PermissionLevel = ({ permissions }: { permissions: { can_create: boolean; 
 };
 
 export default function SuperAdminManagement() {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SuperAdminManagement.tsx:186',message:'Component loaded - imports successful',data:{filterAvailable:typeof Filter!=='undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -257,6 +252,21 @@ export default function SuperAdminManagement() {
       fetchData();
     }
   }, [user, role]);
+
+  // #region agent log
+  useEffect(() => {
+    const handleScroll = () => {
+      const tabsList = document.querySelector('[data-tabs-list]') as HTMLElement;
+      if (tabsList) {
+        const rect = tabsList.getBoundingClientRect();
+        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SuperAdminManagement.tsx:262',message:'Scroll event - tabs visibility',data:{scrollY:window.scrollY,tabsTop:rect.top,tabsBottom:rect.bottom,isVisible,windowHeight:window.innerHeight},timestamp:Date.now(),sessionId:'debug-session',runId:'tab-visibility',hypothesisId:'A'})}).catch(()=>{});
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  // #endregion
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -1253,7 +1263,7 @@ export default function SuperAdminManagement() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1">
+          <TabsList className="bg-muted/50 p-1 sticky top-0 z-50 mb-6" data-tabs-list>
             <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-background">
               <Users className="h-4 w-4" />
               Users & Roles
@@ -1315,136 +1325,155 @@ export default function SuperAdminManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[500px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[200px]">User</TableHead>
-                        <TableHead>Current Roles</TableHead>
-                        <TableHead>Assign Roles</TableHead>
-                        <TableHead className="w-[120px] text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUsers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                            No users found matching your criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredUsers.map(userItem => (
-                          <TableRow key={userItem.id} className="group">
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-sm font-medium text-primary">
-                                    {userItem.full_name.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="font-medium">{userItem.full_name}</p>
-                                  <p className="text-xs text-muted-foreground truncate max-w-[150px]">
-                                    {userItem.id.slice(0, 8)}...
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1.5">
-                                {userItem.roles.length > 0 ? (
-                                  userItem.roles.map(r => (
-                                    <Badge 
-                                      key={r} 
-                                      className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} font-medium`}
-                                    >
-                                      {r.replace('_', ' ')}
-                                    </Badge>
-                                  ))
-                                ) : (
-                                  <Badge variant="outline" className="text-destructive border-destructive/30">
-                                    No Role Assigned
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-3">
-                                {(() => {
-                                  // Determine which roles to show based on current user's role
-                                  let availableRoles: readonly string[];
-                                  if (role === 'super_admin') {
-                                    availableRoles = SUPER_ADMIN_ROLES;
-                                  } else if (role === 'admin') {
-                                    availableRoles = ADMIN_ROLES;
-                                  } else {
-                                    availableRoles = [];
-                                  }
+                <ParentTable
+                  columns={[
+                    {
+                      id: 'user',
+                      header: (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          User Information
+                        </div>
+                      ),
+                      sticky: 'left',
+                      minWidth: 300,
+                      cell: (row) => (
+                        <div className="flex items-center gap-3">
+                          {row.userItem.avatar_url ? (
+                            <img 
+                              src={row.userItem.avatar_url} 
+                              alt={row.userItem.full_name}
+                              className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-border"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 ring-2 ring-border">
+                              <span className="text-base font-semibold text-primary">
+                                {row.userItem.full_name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm truncate">{row.userItem.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {row.userItem.id.slice(0, 8)}...
+                            </p>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      id: 'currentRoles',
+                      header: 'Current Roles',
+                      cell: (row) => (
+                        <div className="flex flex-wrap gap-1.5">
+                          {row.userItem.roles.length > 0 ? (
+                            row.userItem.roles.map(r => (
+                              <Badge 
+                                key={r} 
+                                className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} font-medium`}
+                              >
+                                {r.replace('_', ' ')}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="text-destructive border-destructive/30">
+                              No Role Assigned
+                            </Badge>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      id: 'assignRoles',
+                      header: 'Assign Roles',
+                      cell: (row) => {
+                        // Determine which roles to show based on current user's role
+                        let availableRoles: readonly string[];
+                        if (role === 'super_admin') {
+                          availableRoles = SUPER_ADMIN_ROLES;
+                        } else if (role === 'admin') {
+                          availableRoles = ADMIN_ROLES;
+                        } else {
+                          availableRoles = [];
+                        }
 
-                                  return availableRoles.map(r => {
-                                    const hasThisRole = userItem.roles.includes(r);
-                                    
-                                    return (
-                                      <label 
-                                        key={r} 
-                                        className="flex items-center gap-1.5 text-xs cursor-pointer select-none hover:bg-muted/50 px-2 py-1 rounded transition-colors"
-                                        title={hasThisRole ? `Remove ${r.replace('_', ' ')} role` : `Assign ${r.replace('_', ' ')} role`}
-                                      >
-                                        <Checkbox
-                                          checked={hasThisRole}
-                                          onCheckedChange={() => toggleRole(userItem.id, r, hasThisRole)}
-                                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                        />
-                                        <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
-                                      </label>
-                                    );
-                                  });
-                                })()}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openUserDetails(userItem)}
-                                  title="View user details"
+                        return (
+                          <div className="flex flex-wrap gap-3">
+                            {availableRoles.map(r => {
+                              const hasThisRole = row.userItem.roles.includes(r);
+                              
+                              return (
+                                <label 
+                                  key={r} 
+                                  className="flex items-center gap-1.5 text-xs cursor-pointer select-none hover:bg-muted/50 px-2 py-1 rounded transition-colors"
+                                  title={hasThisRole ? `Remove ${r.replace('_', ' ')} role` : `Assign ${r.replace('_', ' ')} role`}
                                 >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openPermissionsDialog(userItem)}
-                                  title="View effective permissions (read-only)"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => navigate('/admin/role-permissions')}
-                                  title="Manage Role Permissions"
-                                >
-                                  <Shield className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={true}
-                                  className="opacity-30 cursor-not-allowed"
-                                  title="Termination disabled (View Only Mode)"
-                                >
-                                  <UserX className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
+                                  <Checkbox
+                                    checked={hasThisRole}
+                                    onCheckedChange={() => toggleRole(row.userItem.id, r, hasThisRole)}
+                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                  />
+                                  <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        );
+                      },
+                    },
+                    {
+                      id: 'actions',
+                      header: 'Actions',
+                      align: 'right',
+                      width: 120,
+                      cell: (row) => (
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openUserDetails(row.userItem)}
+                            title="View user details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openPermissionsDialog(row.userItem)}
+                            title="View effective permissions (read-only)"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigate('/admin/role-permissions')}
+                            title="Manage Role Permissions"
+                          >
+                            <Shield className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={true}
+                            className="opacity-30 cursor-not-allowed"
+                            title="Termination disabled (View Only Mode)"
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ),
+                    },
+                  ]}
+                  data={filteredUsers.map(userItem => ({
+                    userItem,
+                  }))}
+                  emptyState={
+                    <p className="text-center">No users found matching your criteria</p>
+                  }
+                  scrollHeight="h-[550px]"
+                  rowClassName="group"
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -2274,11 +2303,11 @@ export default function SuperAdminManagement() {
                           </Button>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             <div className="flex justify-between items-center pt-4 border-t mt-4">
               <p className="text-sm text-muted-foreground">
                 These permissions are inherited from the user's roles

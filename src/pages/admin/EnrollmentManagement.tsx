@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,6 +93,10 @@ export default function EnrollmentManagement() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { theme } = useTheme();
+  
+  // Header background colors for light and dark mode
+  const headerBgColor = theme === 'dark' ? '#D77F37' : '#F3E5DD';
   
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [groupedEnrollments, setGroupedEnrollments] = useState<GroupedEnrollment[]>([]);
@@ -1259,21 +1264,53 @@ export default function EnrollmentManagement() {
               <CardContent>
                 {viewMode === 'table' ? (
                   <ScrollArea className="h-[500px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[40px]">
+                    <div className="min-w-max">
+                      <Table>
+                        <TableHeader className="sticky top-0 z-20">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead 
+                            className="w-[40px]"
+                            style={{ backgroundColor: headerBgColor }}
+                          >
                             <Checkbox
                               checked={selectedStudents.size === filteredGroupedEnrollments.length && filteredGroupedEnrollments.length > 0}
                               onCheckedChange={toggleSelectAll}
                             />
                           </TableHead>
-                          <TableHead>Student</TableHead>
-                          <TableHead>Courses ({filteredGroupedEnrollments.reduce((sum, g) => sum + g.total_courses, 0)})</TableHead>
-                          <TableHead>Enrolled</TableHead>
-                          <TableHead>Progress</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="w-[40px]"></TableHead>
+                          <TableHead 
+                            className="sticky left-[40px] z-30 border-r text-gray-900"
+                            style={{ backgroundColor: headerBgColor }}
+                          >
+                            Student
+                          </TableHead>
+                          <TableHead 
+                            style={{ backgroundColor: headerBgColor }}
+                            className="text-gray-900"
+                          >
+                            Courses ({filteredGroupedEnrollments.reduce((sum, g) => sum + g.total_courses, 0)})
+                          </TableHead>
+                          <TableHead 
+                            style={{ backgroundColor: headerBgColor }}
+                            className="text-gray-900"
+                          >
+                            Enrolled
+                          </TableHead>
+                          <TableHead 
+                            style={{ backgroundColor: headerBgColor }}
+                            className="text-gray-900"
+                          >
+                            Progress
+                          </TableHead>
+                          <TableHead 
+                            style={{ backgroundColor: headerBgColor }}
+                            className="text-gray-900"
+                          >
+                            Status
+                          </TableHead>
+                          <TableHead 
+                            className="w-[40px]"
+                            style={{ backgroundColor: headerBgColor }}
+                          ></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1285,7 +1322,7 @@ export default function EnrollmentManagement() {
                                 onCheckedChange={() => toggleStudentSelection(grouped.user_id)}
                               />
                             </TableCell>
-                            <TableCell className="font-medium">
+                            <TableCell className="sticky left-[40px] z-10 bg-background border-r font-medium">
                               <div>
                                 <div>{grouped.user_name}</div>
                                 <div className="text-xs text-muted-foreground mt-0.5">
@@ -1383,6 +1420,7 @@ export default function EnrollmentManagement() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </ScrollArea>
                 ) : (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1538,16 +1576,52 @@ export default function EnrollmentManagement() {
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[500px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[60px]">Position</TableHead>
-                        <TableHead>Student</TableHead>
-                        <TableHead>Course</TableHead>
-                        <TableHead>Joined</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Expires</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
+                  <div className="min-w-max">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-20">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead 
+                            className="w-[60px] text-gray-900"
+                            style={{ backgroundColor: headerBgColor }}
+                          >
+                            Position
+                          </TableHead>
+                          <TableHead 
+                            className="sticky left-[60px] z-30 border-r text-gray-900"
+                            style={{ backgroundColor: headerBgColor }}
+                          >
+                            Student
+                          </TableHead>
+                        <TableHead 
+                          className="text-gray-900"
+                          style={{ backgroundColor: headerBgColor }}
+                        >
+                          Course
+                        </TableHead>
+                        <TableHead 
+                          className="text-gray-900"
+                          style={{ backgroundColor: headerBgColor }}
+                        >
+                          Joined
+                        </TableHead>
+                        <TableHead 
+                          className="text-gray-900"
+                          style={{ backgroundColor: headerBgColor }}
+                        >
+                          Status
+                        </TableHead>
+                        <TableHead 
+                          className="text-gray-900"
+                          style={{ backgroundColor: headerBgColor }}
+                        >
+                          Expires
+                        </TableHead>
+                        <TableHead 
+                          className="w-[100px] text-gray-900"
+                          style={{ backgroundColor: headerBgColor }}
+                        >
+                          Actions
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1566,7 +1640,7 @@ export default function EnrollmentManagement() {
                                 #{entry.position}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-medium">{entry.user_name}</TableCell>
+                            <TableCell className="sticky left-[60px] z-10 bg-background border-r font-medium">{entry.user_name}</TableCell>
                             <TableCell>{entry.course_title}</TableCell>
                             <TableCell>
                               <div className="flex flex-col">
@@ -1617,8 +1691,9 @@ export default function EnrollmentManagement() {
                           </TableRow>
                         ))
                       )}
-                    </TableBody>
-                  </Table>
+                      </TableBody>
+                    </Table>
+                  </div>
                 </ScrollArea>
               </CardContent>
             </Card>

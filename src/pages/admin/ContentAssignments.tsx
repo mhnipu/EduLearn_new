@@ -392,7 +392,7 @@ export default function ContentAssignments() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>User</TableHead>
+                        <TableHead className="sticky left-0 z-30 bg-muted/80 backdrop-blur-sm border-r">User</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead className="w-[80px]">Action</TableHead>
                       </TableRow>
@@ -400,7 +400,7 @@ export default function ContentAssignments() {
                     <TableBody>
                       {assignments.map((a) => (
                         <TableRow key={a.id}>
-                          <TableCell>{a.user_name}</TableCell>
+                          <TableCell className="sticky left-0 z-10 bg-background border-r">{a.user_name}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{a.user_role}</Badge>
                           </TableCell>

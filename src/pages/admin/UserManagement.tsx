@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { ParentTable } from '@/components/ui/parent-table';
 import {
   Table,
   TableBody,
@@ -15,6 +16,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TableEmptyState } from '@/components/ui/table-empty';
+import { TableSkeleton } from '@/components/ui/table-skeleton';
+import { TableActions } from '@/components/ui/table-actions';
+import { StatusBadge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -55,12 +60,15 @@ import {
   LayoutGrid,
   LayoutList,
   User,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PermissionMatrixCard } from '@/components/permissions/PermissionMatrixCard';
 import { BackButton } from '@/components/BackButton';
@@ -107,6 +115,27 @@ type PermissionMatrix = {
   permission_count: number;
 };
 
+type RoleModulePermission = {
+  module_id: string;
+  module_name: string;
+  can_create: boolean;
+  can_read: boolean;
+  can_update: boolean;
+  can_delete: boolean;
+  can_assign: boolean;
+  can_approve: boolean;
+};
+
+type RolePermissions = {
+  [moduleId: string]: RoleModulePermission;
+};
+
+type RoleData = {
+  role: string;
+  permissions: RolePermissions;
+  userCount: number;
+};
+
 // DEPRECATED: grant_permission and revoke_permission removed - permissions are now managed at role level
 type BulkAction = 'add_role' | 'remove_role';
 
@@ -124,8 +153,15 @@ const ROLE_COLORS: Record<string, { bg: string; text: string; border: string }> 
   guardian: { bg: 'bg-chart-4/10', text: 'text-chart-4', border: 'border-chart-4/30' },
 };
 
-const PermissionIcon = ({ granted, type }: { granted: boolean; type: 'create' | 'read' | 'update' | 'delete' }) => {
-  const icons = { create: Plus, read: Eye, update: Edit, delete: Trash2 };
+const PermissionIcon = ({ granted, type }: { granted: boolean; type: 'create' | 'read' | 'update' | 'delete' | 'assign' | 'approve' }) => {
+  const icons = { 
+    create: Plus, 
+    read: Eye, 
+    update: Edit, 
+    delete: Trash2,
+    assign: Users,
+    approve: CheckCircle2
+  };
   const Icon = icons[type];
   
   return (
@@ -192,6 +228,13 @@ export default function UserManagement() {
   const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
 
+  // Role Permission Management state
+  const [rolesData, setRolesData] = useState<Record<string, RoleData>>({});
+  const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<string>('super_admin');
+  const [hasPermissionChanges, setHasPermissionChanges] = useState(false);
+  const [rolePermissionModuleSearch, setRolePermissionModuleSearch] = useState('');
+  const [rolePermissionModuleFilter, setRolePermissionModuleFilter] = useState<string>('all');
+
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
@@ -206,9 +249,27 @@ export default function UserManagement() {
     }
   }, [user, role]);
 
+  // #region agent log
+  useEffect(() => {
+    const handleScroll = () => {
+      const tabsList = document.querySelector('[data-tabs-list]') as HTMLElement;
+      if (tabsList) {
+        const rect = tabsList.getBoundingClientRect();
+        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:207',message:'Scroll event - tabs visibility',data:{scrollY:window.scrollY,tabsTop:rect.top,tabsBottom:rect.bottom,isVisible,windowHeight:window.innerHeight},timestamp:Date.now(),sessionId:'debug-session',runId:'tab-visibility',hypothesisId:'A'})}).catch(()=>{});
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  // #endregion
+
   const fetchData = async () => {
     setIsLoading(true);
     await Promise.all([fetchUsers(), fetchModules(), fetchCustomRoles()]);
+    if (isSuperAdmin) {
+      await fetchRolePermissions();
+    }
     setIsLoading(false);
   };
 
@@ -430,6 +491,191 @@ export default function UserManagement() {
     }
   };
 
+  // Role Permission Management functions
+  const fetchRolePermissions = async () => {
+    const rolesToFetch = [...ALL_ROLES, ...customRoles];
+    const rolesPermissions: Record<string, RoleData> = {};
+
+    // Initialize all roles
+    for (const roleName of rolesToFetch) {
+      rolesPermissions[roleName] = {
+        role: roleName,
+        permissions: {},
+        userCount: 0,
+      };
+    }
+
+    // Fetch role permissions
+    const { data: rolePerms, error: permsError } = await supabase
+      .from('role_module_permissions')
+      .select(`
+        role,
+        module_id,
+        can_create,
+        can_read,
+        can_update,
+        can_delete,
+        can_assign,
+        can_approve,
+        modules!inner(name)
+      `);
+
+    if (permsError) {
+      console.error('Error fetching role permissions:', permsError);
+      return;
+    }
+
+    // Process role permissions
+    (rolePerms || []).forEach((rp: any) => {
+      if (!rolesPermissions[rp.role]) {
+        rolesPermissions[rp.role] = {
+          role: rp.role,
+          permissions: {},
+          userCount: 0,
+        };
+      }
+      rolesPermissions[rp.role].permissions[rp.module_id] = {
+        module_id: rp.module_id,
+        module_name: rp.modules.name,
+        can_create: rp.can_create || false,
+        can_read: rp.can_read || false,
+        can_update: rp.can_update || false,
+        can_delete: rp.can_delete || false,
+        can_assign: rp.can_assign || false,
+        can_approve: rp.can_approve || false,
+      };
+    });
+
+    // Fetch user counts for each role
+    const { data: userRoles, error: userRolesError } = await supabase
+      .from('user_roles')
+      .select('role');
+
+    if (!userRolesError && userRoles) {
+      const roleCounts: Record<string, number> = {};
+      userRoles.forEach(ur => {
+        roleCounts[ur.role] = (roleCounts[ur.role] || 0) + 1;
+      });
+      Object.keys(rolesPermissions).forEach(roleName => {
+        rolesPermissions[roleName].userCount = roleCounts[roleName] || 0;
+      });
+    }
+
+    setRolesData(rolesPermissions);
+  };
+
+  const togglePermission = (
+    roleName: string,
+    moduleId: string,
+    permission: 'can_create' | 'can_read' | 'can_update' | 'can_delete' | 'can_assign' | 'can_approve'
+  ) => {
+    setRolesData(prev => {
+      const updated = { ...prev };
+      if (!updated[roleName]) {
+        updated[roleName] = {
+          role: roleName,
+          permissions: {},
+          userCount: 0,
+        };
+      }
+      if (!updated[roleName].permissions[moduleId]) {
+        const module = modules.find(m => m.id === moduleId);
+        updated[roleName].permissions[moduleId] = {
+          module_id: moduleId,
+          module_name: module?.name || '',
+          can_create: false,
+          can_read: false,
+          can_update: false,
+          can_delete: false,
+          can_assign: false,
+          can_approve: false,
+        };
+      }
+      updated[roleName].permissions[moduleId][permission] = 
+        !updated[roleName].permissions[moduleId][permission];
+      setHasPermissionChanges(true);
+      return updated;
+    });
+  };
+
+  const saveRolePermissions = async (roleName: string) => {
+    try {
+      const roleData = rolesData[roleName];
+      if (!roleData) return;
+
+      // Save or update each module permission
+      for (const [moduleId, perm] of Object.entries(roleData.permissions)) {
+        const { error } = await supabase
+          .from('role_module_permissions')
+          .upsert({
+            role: roleName,
+            module_id: moduleId,
+            can_create: perm.can_create,
+            can_read: perm.can_read,
+            can_update: perm.can_update,
+            can_delete: perm.can_delete,
+            can_assign: perm.can_assign || false,
+            can_approve: perm.can_approve || false,
+          }, {
+            onConflict: 'role,module_id'
+          });
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Success',
+        description: `Permissions for ${roleName.replace('_', ' ')} role saved successfully`,
+      });
+
+      setHasPermissionChanges(false);
+      await fetchRolePermissions();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save permissions',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const setAllPermissions = (roleName: string, moduleId: string, grant: boolean) => {
+    setRolesData(prev => {
+      const updated = { ...prev };
+      if (!updated[roleName]) {
+        updated[roleName] = {
+          role: roleName,
+          permissions: {},
+          userCount: 0,
+        };
+      }
+      if (!updated[roleName].permissions[moduleId]) {
+        const module = modules.find(m => m.id === moduleId);
+        updated[roleName].permissions[moduleId] = {
+          module_id: moduleId,
+          module_name: module?.name || '',
+          can_create: false,
+          can_read: false,
+          can_update: false,
+          can_delete: false,
+          can_assign: false,
+          can_approve: false,
+        };
+      }
+      updated[roleName].permissions[moduleId] = {
+        ...updated[roleName].permissions[moduleId],
+        can_create: grant,
+        can_read: grant,
+        can_update: grant,
+        can_delete: grant,
+        can_assign: grant,
+        can_approve: grant,
+      };
+      setHasPermissionChanges(true);
+      return updated;
+    });
+  };
+
   const toggleRole = async (userId: string, toggledRole: string, hasRole: boolean) => {
     // Prevent non-super_admin from modifying admin roles
     if (!isSuperAdmin && (toggledRole === 'super_admin' || toggledRole === 'admin')) {
@@ -453,24 +699,14 @@ export default function UserManagement() {
   };
 
   // DEPRECATED: User-level permission editing is removed in pure RBAC system
-  // Permissions are now managed at the role level via Role Permission Management page
-  // These functions are kept for backward compatibility but show a message directing to role management
+  // Permissions are now managed at the role level via Role Permission Management tab
+  // This function is kept for backward compatibility but shows a message directing to role management
   const updatePermission = async (moduleId: string, field: 'can_create' | 'can_read' | 'can_update' | 'can_delete', value: boolean) => {
     toast({ 
       title: 'Permission Management Changed', 
-      description: 'Permissions are now managed at the role level. Please use Role Permission Management to update role permissions.',
+      description: 'Permissions are now managed at the role level. Please use Role Permission Management tab to update role permissions.',
       variant: 'default'
     });
-    navigate('/admin/role-permissions');
-  };
-
-  const setAllPermissions = async (moduleId: string, grant: boolean) => {
-    toast({ 
-      title: 'Permission Management Changed', 
-      description: 'Permissions are now managed at the role level. Please use Role Permission Management to update role permissions.',
-      variant: 'default'
-    });
-    navigate('/admin/role-permissions');
   };
 
   // DEPRECATED: User-level permission editing removed - redirect to role permission management
@@ -703,7 +939,7 @@ export default function UserManagement() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1">
+          <TabsList className="bg-muted/50 p-1 sticky top-0 z-50 mb-6" data-tabs-list>
             <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-background">
               <Users className="h-4 w-4" />
               Users & Roles
@@ -718,7 +954,6 @@ export default function UserManagement() {
                 <TabsTrigger 
                   value="role-permissions" 
                   className="flex items-center gap-2 data-[state=active]:bg-background"
-                  onClick={() => navigate('/admin/role-permissions')}
                 >
                   <Shield className="h-4 w-4" />
                   Role Permissions
@@ -797,138 +1032,152 @@ export default function UserManagement() {
                 )}
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[500px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[50px]">
-                          <Checkbox 
-                            checked={selectedUsers.size === filteredUsers.length && filteredUsers.length > 0}
-                            onCheckedChange={selectAllUsers}
-                          />
-                        </TableHead>
-                        <TableHead className="w-[200px]">User</TableHead>
-                        <TableHead>Current Roles</TableHead>
-                        <TableHead>Assign Roles</TableHead>
-                        <TableHead className="w-[120px] text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUsers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            No users found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredUsers.map(userItem => (
-                          <TableRow key={userItem.id} className="group">
-                            <TableCell>
-                              <Checkbox 
-                                checked={selectedUsers.has(userItem.id)}
-                                onCheckedChange={() => toggleUserSelection(userItem.id)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-sm font-medium text-primary">
-                                    {userItem.full_name.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="font-medium">{userItem.full_name}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {new Date(userItem.created_at).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1.5">
-                                {userItem.roles.length > 0 ? (
-                                  userItem.roles.map(r => (
-                                    <Badge key={r} className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} font-medium`}>
-                                      {r.replace('_', ' ')}
-                                    </Badge>
-                                  ))
-                                ) : (
-                                  <Badge variant="outline" className="text-destructive border-destructive/30">No Role</Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-3">
-                                {/* Built-in roles */}
-                                {availableRoles.map(r => {
-                                  const hasThisRole = userItem.roles.includes(r);
-                                  const isCurrentUser = userItem.id === user?.id;
-                                  const isProtectedRole = (r === 'super_admin') && isCurrentUser;
-                                  
-                                  return (
-                                    <label key={r} className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${
-                                      isProtectedRole ? 'opacity-50 cursor-not-allowed' : ''
-                                    }`}>
-                                      <Checkbox
-                                        checked={hasThisRole}
-                                        disabled={isProtectedRole}
-                                        onCheckedChange={() => toggleRole(userItem.id, r, hasThisRole)}
-                                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                      />
-                                      <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
-                                    </label>
-                                  );
-                                })}
-                                
-                                {/* Custom roles - only for Admin */}
-                                {isAdmin && customRoles.map(r => {
-                                  const hasThisRole = userItem.roles.includes(r);
-                                  
-                                  return (
-                                    <label key={r} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-                                      <Checkbox
-                                        checked={hasThisRole}
-                                        onCheckedChange={() => toggleRole(userItem.id, r, hasThisRole)}
-                                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                      />
-                                      <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {/* View Permissions Button - Shows effective permissions from roles (read-only) */}
-                              {isSuperAdmin && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openPermissionsDialog(userItem)}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View Permissions
-                                </Button>
-                              )}
-                              {/* Manage Role Permissions Link */}
-                              {isSuperAdmin && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => navigate('/admin/role-permissions')}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
-                                  title="Manage Role Permissions"
-                                >
-                                  <Shield className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
+                <ParentTable
+                  columns={[
+                    {
+                      id: 'select',
+                      header: (
+                        <Checkbox 
+                          checked={selectedUsers.size === filteredUsers.length && filteredUsers.length > 0}
+                          onCheckedChange={selectAllUsers}
+                        />
+                      ),
+                      width: 50,
+                      cell: (row) => (
+                        <Checkbox 
+                          checked={selectedUsers.has(row.userItem.id)}
+                          onCheckedChange={() => toggleUserSelection(row.userItem.id)}
+                        />
+                      ),
+                    },
+                    {
+                      id: 'user',
+                      header: (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          User Information
+                        </div>
+                      ),
+                      sticky: 'left',
+                      minWidth: 300,
+                      cell: (row) => (
+                        <div className="flex items-center gap-3">
+                          {row.userItem.avatar_url ? (
+                            <img 
+                              src={row.userItem.avatar_url} 
+                              alt={row.userItem.full_name}
+                              className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-border"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 ring-2 ring-border">
+                              <span className="text-base font-semibold text-primary">
+                                {row.userItem.full_name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm truncate">{row.userItem.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(row.userItem.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      id: 'currentRoles',
+                      header: 'Current Roles',
+                      cell: (row) => (
+                        <div className="flex flex-wrap gap-1.5">
+                          {row.userItem.roles.length > 0 ? (
+                            row.userItem.roles.map(r => (
+                              <Badge key={r} className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} font-medium`}>
+                                {r.replace('_', ' ')}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="text-destructive border-destructive/30">No Role</Badge>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      id: 'assignRoles',
+                      header: 'Assign Roles',
+                      cell: (row) => (
+                        <div className="flex flex-wrap gap-3">
+                          {/* Built-in roles */}
+                          {availableRoles.map(r => {
+                            const hasThisRole = row.userItem.roles.includes(r);
+                            const isCurrentUser = row.userItem.id === user?.id;
+                            const isProtectedRole = (r === 'super_admin') && isCurrentUser;
+                            
+                            return (
+                              <label key={r} className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${
+                                isProtectedRole ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}>
+                                <Checkbox
+                                  checked={hasThisRole}
+                                  disabled={isProtectedRole}
+                                  onCheckedChange={() => toggleRole(row.userItem.id, r, hasThisRole)}
+                                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                />
+                                <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
+                              </label>
+                            );
+                          })}
+                          
+                          {/* Custom roles - only for Admin */}
+                          {isAdmin && customRoles.map(r => {
+                            const hasThisRole = row.userItem.roles.includes(r);
+                            
+                            return (
+                              <label key={r} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                                <Checkbox
+                                  checked={hasThisRole}
+                                  onCheckedChange={() => toggleRole(row.userItem.id, r, hasThisRole)}
+                                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                />
+                                <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ),
+                    },
+                    {
+                      id: 'actions',
+                      header: 'Actions',
+                      align: 'right',
+                      width: 120,
+                      cell: (row) => (
+                        <TableActions
+                          actions={[
+                            ...(isSuperAdmin ? [{
+                              label: 'View Permissions',
+                              icon: Eye,
+                              onClick: () => openPermissionsDialog(row.userItem),
+                            }] : []),
+                          ]}
+                        />
+                      ),
+                    },
+                  ]}
+                  data={filteredUsers.map(userItem => ({
+                    userItem,
+                  }))}
+                  loading={isLoading}
+                  emptyState={
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Users className="h-8 w-8" />
+                      <p>No users found</p>
+                      <p className="text-xs">Try adjusting your search or filter criteria</p>
+                    </div>
+                  }
+                  scrollHeight="h-[550px]"
+                  rowClassName="group"
+                  getRowKey={(row) => row.userItem.id}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1000,123 +1249,117 @@ export default function UserManagement() {
               <CardContent className="p-0">
                 {matrixViewMode === 'table' ? (
                   /* Table View */
-                  <ScrollArea className="h-[550px]">
-                    <div className="min-w-max">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-20">
-                          <TableRow className="hover:bg-transparent bg-muted/80 backdrop-blur-sm">
-                            <TableHead className="sticky left-0 z-30 min-w-[300px] border-r bg-muted/80 backdrop-blur-sm">
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                User Information
+                  <ParentTable
+                    columns={[
+                      {
+                        id: 'user',
+                        header: (
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            User Information
+                          </div>
+                        ),
+                        sticky: 'left',
+                        minWidth: 300,
+                        cell: (row) => (
+                          <div className="flex items-center gap-3">
+                            {row.userRow.avatar_url ? (
+                              <img 
+                                src={row.userRow.avatar_url} 
+                                alt={row.userRow.user_name}
+                                className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-border"
+                              />
+                            ) : (
+                              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 ring-2 ring-border">
+                                <span className="text-base font-semibold text-primary">
+                                  {row.userRow.user_name.charAt(0).toUpperCase()}
+                                </span>
                               </div>
-                            </TableHead>
-                            {(matrixModuleFilter === 'all' ? modules : modules.filter(m => m.id === matrixModuleFilter)).map(m => (
-                              <TableHead key={m.id} className="text-center min-w-[160px] px-3 bg-muted/80 backdrop-blur-sm">
-                                <div className="flex flex-col items-center gap-1.5">
-                                  <Badge variant="outline" className="font-medium">
-                                    {m.name}
+                            )}
+                            
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-sm truncate">{row.userRow.user_name}</p>
+                              
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                {row.userRow.roles.length > 0 ? (
+                                  row.userRow.roles.slice(0, 3).map(r => (
+                                    <Badge 
+                                      key={r} 
+                                      className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} text-[10px] py-0 px-1.5 h-5`}
+                                    >
+                                      {r.replace('_', ' ')}
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-5 text-muted-foreground">
+                                    No Role
                                   </Badge>
-                                  <div className="flex gap-1 text-[10px] font-medium text-muted-foreground">
-                                    <span className="w-6 text-center bg-muted rounded px-1">C</span>
-                                    <span className="w-6 text-center bg-muted rounded px-1">R</span>
-                                    <span className="w-6 text-center bg-muted rounded px-1">U</span>
-                                    <span className="w-6 text-center bg-muted rounded px-1">D</span>
-                                  </div>
-                                </div>
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredMatrix.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={modules.length + 1} className="text-center py-12">
-                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                  <Users className="h-8 w-8" />
-                                  <p>No users found</p>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredMatrix.map(userRow => (
-                              <TableRow key={userRow.user_id} className="group hover:bg-muted/30 transition-colors">
-                                <TableCell className="sticky left-0 z-10 border-r min-w-[300px] bg-background group-hover:bg-muted/30 transition-colors">
-                                  <div className="flex items-center gap-3">
-                                    {userRow.avatar_url ? (
-                                      <img 
-                                        src={userRow.avatar_url} 
-                                        alt={userRow.user_name}
-                                        className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-border"
-                                      />
-                                    ) : (
-                                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 ring-2 ring-border">
-                                        <span className="text-base font-semibold text-primary">
-                                          {userRow.user_name.charAt(0).toUpperCase()}
-                                        </span>
-                                      </div>
-                                    )}
-                                    
-                                    <div className="min-w-0 flex-1">
-                                      <p className="font-semibold text-sm truncate">{userRow.user_name}</p>
-                                      
-                                      <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                        {userRow.roles.length > 0 ? (
-                                          userRow.roles.slice(0, 3).map(r => (
-                                            <Badge 
-                                              key={r} 
-                                              className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} text-[10px] py-0 px-1.5 h-5`}
-                                            >
-                                              {r.replace('_', ' ')}
-                                            </Badge>
-                                          ))
-                                        ) : (
-                                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-5 text-muted-foreground">
-                                            No Role
-                                          </Badge>
-                                        )}
-                                        {userRow.roles.length > 3 && (
-                                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-5">
-                                            +{userRow.roles.length - 3}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      
-                                      <div className="flex items-center gap-2 mt-1.5">
-                                        <Badge variant={userRow.permission_count > 0 ? 'default' : 'outline'} className="text-[10px] py-0 h-5">
-                                          <Shield className="h-3 w-3 mr-1" />
-                                          {userRow.permission_count} perms
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                {(matrixModuleFilter === 'all' ? modules : modules.filter(m => m.id === matrixModuleFilter)).map(m => {
-                                  const perms = userRow.permissions[m.id] || { can_create: false, can_read: false, can_update: false, can_delete: false };
-                                  const permCount = [perms.can_create, perms.can_read, perms.can_update, perms.can_delete].filter(Boolean).length;
-                                  return (
-                                    <TableCell key={m.id} className="text-center px-3">
-                                      <div className="flex flex-col items-center gap-1">
-                                        <div className="flex justify-center gap-1">
-                                          <PermissionIcon granted={perms.can_create} type="create" />
-                                          <PermissionIcon granted={perms.can_read} type="read" />
-                                          <PermissionIcon granted={perms.can_update} type="update" />
-                                          <PermissionIcon granted={perms.can_delete} type="delete" />
-                                        </div>
-                                        <span className={`text-[10px] ${permCount === 4 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-                                          {permCount}/4
-                                        </span>
-                                      </div>
-                                    </TableCell>
-                                  );
-                                })}
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </ScrollArea>
+                                )}
+                                {row.userRow.roles.length > 3 && (
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-5">
+                                    +{row.userRow.roles.length - 3}
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <Badge variant={row.userRow.permission_count > 0 ? 'default' : 'outline'} className="text-[10px] py-0 h-5">
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  {row.userRow.permission_count} perms
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        ),
+                      },
+                      ...(matrixModuleFilter === 'all' ? modules : modules.filter(m => m.id === matrixModuleFilter)).map(m => ({
+                        id: `module-${m.id}`,
+                        header: (
+                          <div className="flex flex-col items-center gap-1.5">
+                            <Badge variant="outline" className="font-medium">
+                              {m.name}
+                            </Badge>
+                            <div className="flex gap-1 text-[10px] font-medium text-muted-foreground">
+                              <span className="w-6 text-center bg-muted rounded px-1">C</span>
+                              <span className="w-6 text-center bg-muted rounded px-1">R</span>
+                              <span className="w-6 text-center bg-muted rounded px-1">U</span>
+                              <span className="w-6 text-center bg-muted rounded px-1">D</span>
+                            </div>
+                          </div>
+                        ),
+                        align: 'center' as const,
+                        minWidth: 160,
+                        className: 'px-3',
+                        cell: (row) => {
+                          const perms = row.userRow.permissions[m.id] || { can_create: false, can_read: false, can_update: false, can_delete: false };
+                          const permCount = [perms.can_create, perms.can_read, perms.can_update, perms.can_delete].filter(Boolean).length;
+                          return (
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex justify-center gap-1">
+                                <PermissionIcon granted={perms.can_create} type="create" />
+                                <PermissionIcon granted={perms.can_read} type="read" />
+                                <PermissionIcon granted={perms.can_update} type="update" />
+                                <PermissionIcon granted={perms.can_delete} type="delete" />
+                              </div>
+                              <span className={`text-[10px] ${permCount === 4 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                                {permCount}/4
+                              </span>
+                            </div>
+                          );
+                        },
+                      })),
+                    ]}
+                    data={filteredMatrix.map(userRow => ({
+                      userRow,
+                    }))}
+                    emptyState={
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Users className="h-8 w-8" />
+                        <p>No users found</p>
+                      </div>
+                    }
+                    scrollHeight="h-[550px]"
+                  />
                 ) : (
                   /* Card View (Mobile-Friendly) */
                   <ScrollArea className="h-[550px] p-4">
@@ -1140,6 +1383,285 @@ export default function UserManagement() {
                     </div>
                   </ScrollArea>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          )}
+
+          {/* Role Permissions Tab - Super Admin Only */}
+          {isSuperAdmin && (
+          <TabsContent value="role-permissions">
+            <Card className="border-border">
+              <CardHeader className="border-b border-border">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-primary" />
+                        Role Permission Management
+                      </CardTitle>
+                      <CardDescription className="mt-2">
+                        Manage module permissions for each role. All users with the same role will have identical permissions.
+                      </CardDescription>
+                    </div>
+                    <Button onClick={fetchRolePermissions} variant="outline" size="sm" className="gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </Button>
+                  </div>
+                  
+                  {/* Filters */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search modules..."
+                        value={rolePermissionModuleSearch}
+                        onChange={(e) => setRolePermissionModuleSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <Select value={rolePermissionModuleFilter} onValueChange={setRolePermissionModuleFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Filter module" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Modules</SelectItem>
+                        {modules.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Alert className="m-6 mb-0">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Important:</strong> This is a pure role-based permission system. 
+                    Permissions are assigned to roles, and all users with the same role inherit the same permissions. 
+                    Changes to role permissions affect all users with that role immediately.
+                  </AlertDescription>
+                </Alert>
+
+                <Tabs defaultValue={ALL_ROLES[0]} className="space-y-6 mt-6">
+                  <TabsList className="bg-muted/50 p-1 mx-6">
+                    {ALL_ROLES.map(roleName => {
+                      const roleData = rolesData[roleName];
+                      const userCount = roleData?.userCount || 0;
+                      return (
+                        <TabsTrigger 
+                          key={roleName} 
+                          value={roleName}
+                          className="flex items-center gap-2 data-[state=active]:bg-background"
+                        >
+                          <span className="capitalize">{roleName.replace('_', ' ')}</span>
+                          {userCount > 0 && (
+                            <Badge variant="secondary" className="ml-1">
+                              {userCount} {userCount === 1 ? 'user' : 'users'}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+
+                  {ALL_ROLES.map(roleName => {
+                    const roleData = rolesData[roleName] || {
+                      role: roleName,
+                      permissions: {},
+                      userCount: 0,
+                    };
+
+                    const filteredModules = (rolePermissionModuleFilter === 'all' 
+                      ? modules.filter(m => 
+                          m.name.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()) ||
+                          m.description?.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase())
+                        )
+                      : modules.filter(m => 
+                          m.id === rolePermissionModuleFilter &&
+                          (m.name.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()) ||
+                          m.description?.toLowerCase().includes(rolePermissionModuleSearch.toLowerCase()))
+                        )
+                    );
+
+                    return (
+                      <TabsContent key={roleName} value={roleName} className="px-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={`${ROLE_COLORS[roleName]?.bg} ${ROLE_COLORS[roleName]?.text}`}>
+                                {roleName.replace('_', ' ').toUpperCase()}
+                              </Badge>
+                              {roleData.userCount > 0 && (
+                                <span className="text-sm font-normal text-muted-foreground">
+                                  ({roleData.userCount} {roleData.userCount === 1 ? 'user' : 'users'})
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Configure module permissions for the {roleName.replace('_', ' ')} role. 
+                              All users with this role will have these permissions.
+                            </p>
+                          </div>
+                          <Button 
+                            onClick={() => saveRolePermissions(roleName)}
+                            disabled={!hasPermissionChanges}
+                            className="gap-2"
+                          >
+                            <Save className="h-4 w-4" />
+                            Save Changes
+                          </Button>
+                        </div>
+
+                        <ParentTable
+                          columns={[
+                            {
+                              id: 'module',
+                              header: (
+                                <div className="flex items-center gap-2">
+                                  <Shield className="h-4 w-4" />
+                                  Module
+                                </div>
+                              ),
+                              sticky: 'left',
+                              minWidth: 300,
+                              cell: (row) => (
+                                <div>
+                                  <div className="font-medium">{row.module.name}</div>
+                                  {row.module.description && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      {row.module.description}
+                                    </div>
+                                  )}
+                                </div>
+                              ),
+                            },
+                            {
+                              id: 'create',
+                              header: 'Create',
+                              align: 'center',
+                              minWidth: 100,
+                              cellType: 'checkbox',
+                              checkboxProps: (row) => ({
+                                checked: row.permission.can_create,
+                                onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_create'),
+                              }),
+                            },
+                            {
+                              id: 'read',
+                              header: 'Read',
+                              align: 'center',
+                              minWidth: 100,
+                              cellType: 'checkbox',
+                              checkboxProps: (row) => ({
+                                checked: row.permission.can_read,
+                                onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_read'),
+                              }),
+                            },
+                            {
+                              id: 'update',
+                              header: 'Update',
+                              align: 'center',
+                              minWidth: 100,
+                              cellType: 'checkbox',
+                              checkboxProps: (row) => ({
+                                checked: row.permission.can_update,
+                                onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_update'),
+                              }),
+                            },
+                            {
+                              id: 'delete',
+                              header: 'Delete',
+                              align: 'center',
+                              minWidth: 100,
+                              cellType: 'checkbox',
+                              checkboxProps: (row) => ({
+                                checked: row.permission.can_delete,
+                                onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_delete'),
+                              }),
+                            },
+                            {
+                              id: 'assign',
+                              header: 'Assign',
+                              align: 'center',
+                              minWidth: 100,
+                              cellType: 'checkbox',
+                              checkboxProps: (row) => ({
+                                checked: row.permission.can_assign || false,
+                                onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_assign'),
+                              }),
+                            },
+                            {
+                              id: 'approve',
+                              header: 'Approve',
+                              align: 'center',
+                              minWidth: 100,
+                              cellType: 'checkbox',
+                              checkboxProps: (row) => ({
+                                checked: row.permission.can_approve || false,
+                                onCheckedChange: () => togglePermission(roleName, row.module.id, 'can_approve'),
+                              }),
+                            },
+                            {
+                              id: 'all',
+                              header: (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="text-xs text-muted-foreground cursor-help">All</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Toggle all permissions for module</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ),
+                              align: 'right',
+                              minWidth: 120,
+                              cellType: 'button',
+                              buttonProps: (row) => ({
+                                onClick: () => setAllPermissions(roleName, row.module.id, !row.allGranted),
+                                children: row.allGranted ? 'Clear' : 'Grant All',
+                                variant: 'ghost' as const,
+                                size: 'sm' as const,
+                              }),
+                            },
+                          ]}
+                          data={filteredModules.map(module => {
+                            const perm = roleData.permissions[module.id] || {
+                              module_id: module.id,
+                              module_name: module.name,
+                              can_create: false,
+                              can_read: false,
+                              can_update: false,
+                              can_delete: false,
+                              can_assign: false,
+                              can_approve: false,
+                            };
+
+                            const allGranted = perm.can_create && perm.can_read && 
+                                              perm.can_update && perm.can_delete && 
+                                              perm.can_assign && perm.can_approve;
+
+                            return {
+                              module,
+                              permission: perm,
+                              allGranted,
+                            };
+                          })}
+                          emptyState={
+                            <p className="text-center">No modules found</p>
+                          }
+                          scrollHeight="h-[550px]"
+                          getRowKey={(row) => row.module.id}
+                        />
+                      </TabsContent>
+                    );
+                  })}
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>

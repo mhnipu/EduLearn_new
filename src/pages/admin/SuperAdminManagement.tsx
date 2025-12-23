@@ -9,6 +9,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { ParentTable } from '@/components/ui/parent-table';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -56,7 +64,8 @@ import {
   CheckCircle2,
   Upload,
   Save,
-  AlertCircle
+  AlertCircle,
+  User
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -74,6 +83,7 @@ type UserWithRoles = {
   full_name: string;
   roles: string[];
   created_at: string;
+  avatar_url?: string | null;
 };
 
 type Module = {
@@ -177,9 +187,6 @@ const PermissionLevel = ({ permissions }: { permissions: { can_create: boolean; 
 };
 
 export default function SuperAdminManagement() {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SuperAdminManagement.tsx:186',message:'Component loaded - imports successful',data:{filterAvailable:typeof Filter!=='undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -253,21 +260,6 @@ export default function SuperAdminManagement() {
     }
   }, [user, role]);
 
-  // #region agent log
-  useEffect(() => {
-    const handleScroll = () => {
-      const tabsList = document.querySelector('[data-tabs-list]') as HTMLElement;
-      if (tabsList) {
-        const rect = tabsList.getBoundingClientRect();
-        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-        fetch('http://127.0.0.1:7243/ingest/346748d1-2e19-4d58-affc-c5851b8a5962',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SuperAdminManagement.tsx:262',message:'Scroll event - tabs visibility',data:{scrollY:window.scrollY,tabsTop:rect.top,tabsBottom:rect.bottom,isVisible,windowHeight:window.innerHeight},timestamp:Date.now(),sessionId:'debug-session',runId:'tab-visibility',hypothesisId:'A'})}).catch(()=>{});
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-  // #endregion
-
   const fetchData = async () => {
     setIsLoading(true);
     await Promise.all([
@@ -285,7 +277,7 @@ export default function SuperAdminManagement() {
     try {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, created_at');
+        .select('id, full_name, created_at, avatar_url');
 
       if (profilesError) throw profilesError;
 
@@ -400,17 +392,40 @@ export default function SuperAdminManagement() {
 
   const fetchRecentActivity = async () => {
     try {
-      const { data, error } = await supabase
+      // Query activity_feed without foreign key relationship
+      const { data: activityData, error } = await supabase
         .from('activity_feed')
-        .select(`
-          *,
-          profiles:user_id(full_name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(15);
 
-      if (!error && data) {
-        setRecentActivity(data);
+      if (error) throw error;
+
+      // If we have activity data with user_ids, fetch the profile names separately
+      if (activityData && activityData.length > 0) {
+        const userIds = [...new Set(activityData.map(a => a.user_id).filter(Boolean))];
+        
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', userIds);
+
+          // Create a map of user_id to profile
+          const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+          // Merge profile data into activity data
+          const enrichedActivity = activityData.map(activity => ({
+            ...activity,
+            profiles: activity.user_id ? profileMap.get(activity.user_id) : undefined
+          }));
+
+          setRecentActivity(enrichedActivity);
+        } else {
+          setRecentActivity(activityData);
+        }
+      } else {
+        setRecentActivity([]);
       }
     } catch (error) {
       console.error('Error fetching recent activity:', error);
@@ -420,7 +435,8 @@ export default function SuperAdminManagement() {
 
   const fetchCustomRoles = async () => {
     try {
-      const { data, error } = await supabase
+      // custom_roles table exists but not in generated types
+      const { data, error } = await (supabase as any)
         .from('custom_roles')
         .select('role_name')
         .order('created_at', { ascending: false });
@@ -448,7 +464,8 @@ export default function SuperAdminManagement() {
     try {
       const roleName = newCustomRole.trim().toLowerCase().replace(/\s+/g, '_');
       
-      const { error } = await supabase
+      // custom_roles table exists but not in generated types
+      const { error } = await (supabase as any)
         .from('custom_roles')
         .insert([{
           role_name: roleName,
@@ -495,7 +512,8 @@ export default function SuperAdminManagement() {
       }
 
       // Fetch role permissions
-      const { data: rolePerms, error: permsError } = await supabase
+      // role_module_permissions table exists but not in generated types
+      const { data: rolePerms, error: permsError } = await (supabase as any)
         .from('role_module_permissions')
         .select(`
           role,
@@ -598,7 +616,8 @@ export default function SuperAdminManagement() {
 
         // Save or update each module permission
         for (const [moduleId, perm] of Object.entries(roleData.permissions)) {
-          const { error } = await supabase
+          // role_module_permissions table exists but not in generated types
+          const { error } = await (supabase as any)
             .from('role_module_permissions')
             .upsert({
               role: roleToSave,
@@ -1410,7 +1429,7 @@ export default function SuperAdminManagement() {
                                 >
                                   <Checkbox
                                     checked={hasThisRole}
-                                    onCheckedChange={() => toggleRole(row.userItem.id, r, hasThisRole)}
+                                    onCheckedChange={() => toggleRole(row.userItem.id, r as typeof ALL_ROLES[number], hasThisRole)}
                                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                   />
                                   <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>

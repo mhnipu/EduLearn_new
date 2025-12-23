@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -129,7 +130,9 @@ export default function EnrollmentManagement() {
   const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<WaitlistEntry | null>(null);
   
   // New enrollment form
+  const [enrollmentMode, setEnrollmentMode] = useState<'single' | 'bulk'>('single');
   const [selectedStudent, setSelectedStudent] = useState<string>('');
+  const [selectedStudentsForEnrollment, setSelectedStudentsForEnrollment] = useState<Set<string>>(new Set());
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [isCreatingEnrollment, setIsCreatingEnrollment] = useState(false);
@@ -138,6 +141,19 @@ export default function EnrollmentManagement() {
   // Users by role
   const [students, setStudents] = useState<UserWithRole[]>([]);
   const [teachers, setTeachers] = useState<UserWithRole[]>([]);
+
+  // Reset enrollment form when dialog closes
+  useEffect(() => {
+    if (!enrollDialogOpen) {
+      // Reset all form states when dialog closes
+      setEnrollmentMode('single');
+      setSelectedStudent('');
+      setSelectedStudentsForEnrollment(new Set());
+      setSelectedCourse('');
+      setSelectedTeacher('');
+      setExistingCoursesForStudent([]);
+    }
+  }, [enrollDialogOpen]);
 
   useEffect(() => {
     if (role !== 'admin' && role !== 'super_admin') {
@@ -574,87 +590,201 @@ export default function EnrollmentManagement() {
   };
 
   const handleCreateEnrollment = async () => {
-    if (!selectedStudent || !selectedCourse) {
-      toast({ title: 'Please select both student and course', variant: 'destructive' });
+    // Validation based on mode
+    if (!selectedCourse) {
+      toast({ title: 'Please select a course', variant: 'destructive' });
       return;
+    }
+
+    if (enrollmentMode === 'single') {
+      if (!selectedStudent) {
+        toast({ title: 'Please select a student', variant: 'destructive' });
+        return;
+      }
+    } else {
+      if (selectedStudentsForEnrollment.size === 0) {
+        toast({ title: 'Please select at least one student', variant: 'destructive' });
+        return;
+      }
     }
 
     setIsCreatingEnrollment(true);
     try {
-      // Check if student already has enrollments
-      const { data: existingEnrollments } = await supabase
-        .from('course_enrollments')
-        .select('course_id, courses(title)')
-        .eq('user_id', selectedStudent);
+      if (enrollmentMode === 'single') {
+        // Single enrollment mode - existing logic
+        const { data: existingEnrollments } = await supabase
+          .from('course_enrollments')
+          .select('course_id, courses(title)')
+          .eq('user_id', selectedStudent);
 
-      const existingCourseIds = existingEnrollments?.map(e => e.course_id) || [];
-      
-      if (existingCourseIds.includes(selectedCourse)) {
-        toast({ 
-          title: 'Already enrolled', 
-          description: 'This student is already enrolled in the selected course.',
-          variant: 'destructive' 
-        });
-        setIsCreatingEnrollment(false);
-        return;
-      }
+        const existingCourseIds = existingEnrollments?.map(e => e.course_id) || [];
+        
+        if (existingCourseIds.includes(selectedCourse)) {
+          toast({ 
+            title: 'Already enrolled', 
+            description: 'This student is already enrolled in the selected course.',
+            variant: 'destructive' 
+          });
+          setIsCreatingEnrollment(false);
+          return;
+        }
 
-      if (existingEnrollments && existingEnrollments.length > 0) {
-        const courseTitles = existingEnrollments.map((e: any) => e.courses?.title || 'Unknown').join(', ');
-        toast({
-          title: 'Student already enrolled in other courses',
-          description: `Current courses: ${courseTitles}. Adding new course...`,
-        });
-      }
-
-      // 1. Create student enrollment using secure RPC function
-      const { data: enrollResult, error: enrollError } = await supabase
-        .rpc('admin_enroll_student', {
-          _student_id: selectedStudent,
-          _course_id: selectedCourse,
-          _admin_id: user?.id,
-        });
-
-      if (enrollError) {
-        throw enrollError;
-      }
-
-      if (!enrollResult?.success) {
-        toast({ title: enrollResult?.error || 'Failed to enroll student', variant: 'destructive' });
-        return;
-      }
-
-      // 2. If teacher is selected, assign teacher using RPC
-      if (selectedTeacher) {
-        const { data: teacherResult, error: teacherError } = await supabase
-          .rpc('admin_assign_teacher', {
-            _teacher_id: selectedTeacher,
+        // Create student enrollment using secure RPC function
+        const { data: enrollResult, error: enrollError } = await supabase
+          .rpc('admin_enroll_student', {
+            _student_id: selectedStudent,
             _course_id: selectedCourse,
             _admin_id: user?.id,
           });
 
-        // Log warning if teacher assignment failed, but don't block enrollment
-        if (teacherError || !teacherResult?.success) {
-          console.warn('Teacher assignment warning:', teacherResult?.error || teacherError);
+        if (enrollError) {
+          throw enrollError;
+        }
+
+        if (!enrollResult?.success) {
+          toast({ title: enrollResult?.error || 'Failed to enroll student', variant: 'destructive' });
+          return;
+        }
+
+        // If teacher is selected, assign teacher using RPC
+        if (selectedTeacher) {
+          const { data: teacherResult, error: teacherError } = await supabase
+            .rpc('admin_assign_teacher', {
+              _teacher_id: selectedTeacher,
+              _course_id: selectedCourse,
+              _admin_id: user?.id,
+            });
+
+          if (teacherError || !teacherResult?.success) {
+            console.warn('Teacher assignment warning:', teacherResult?.error || teacherError);
+          }
+        }
+
+        toast({ 
+          title: 'Enrollment successful!',
+          description: selectedTeacher 
+            ? 'Student enrolled and teacher assigned' 
+            : 'Student enrolled successfully'
+        });
+      } else {
+        // Bulk enrollment mode
+        const studentIds = Array.from(selectedStudentsForEnrollment);
+        
+        // Check existing enrollments for all selected students
+        const { data: existingEnrollments } = await supabase
+          .from('course_enrollments')
+          .select('user_id, course_id')
+          .in('user_id', studentIds)
+          .eq('course_id', selectedCourse);
+
+        const alreadyEnrolled = new Set(
+          existingEnrollments?.map((e: any) => e.user_id) || []
+        );
+
+        // Filter out already enrolled students
+        const studentsToEnroll = studentIds.filter(id => !alreadyEnrolled.has(id));
+
+        if (studentsToEnroll.length === 0) {
+          toast({ 
+            title: 'All students already enrolled', 
+            description: 'All selected students are already enrolled in this course.',
+            variant: 'destructive' 
+          });
+          setIsCreatingEnrollment(false);
+          return;
+        }
+
+        // Process enrollments sequentially
+        let successCount = 0;
+        let failureCount = 0;
+        const errors: string[] = [];
+
+        for (const studentId of studentsToEnroll) {
+          try {
+            const { data: enrollResult, error: enrollError } = await supabase
+              .rpc('admin_enroll_student', {
+                _student_id: studentId,
+                _course_id: selectedCourse,
+                _admin_id: user?.id,
+              });
+
+            if (enrollError) {
+              throw enrollError;
+            }
+
+            if (!enrollResult?.success) {
+              errors.push(enrollResult?.error || 'Unknown error');
+              failureCount++;
+            } else {
+              successCount++;
+            }
+          } catch (error: any) {
+            errors.push(error.message || 'Unknown error');
+            failureCount++;
+          }
+        }
+
+        // Assign teacher if selected (only once for the course)
+        if (selectedTeacher && successCount > 0) {
+          const { data: teacherResult, error: teacherError } = await supabase
+            .rpc('admin_assign_teacher', {
+              _teacher_id: selectedTeacher,
+              _course_id: selectedCourse,
+              _admin_id: user?.id,
+            });
+
+          if (teacherError || !teacherResult?.success) {
+            console.warn('Teacher assignment warning:', teacherResult?.error || teacherError);
+          }
+        }
+
+        // Show summary toast
+        const alreadyEnrolledCount = alreadyEnrolled.size;
+        let description = '';
+        if (successCount > 0) {
+          description += `Successfully enrolled ${successCount} student(s)`;
+          if (selectedTeacher) {
+            description += ' and assigned teacher';
+          }
+        }
+        if (alreadyEnrolledCount > 0) {
+          description += description ? `. ${alreadyEnrolledCount} student(s) already enrolled.` : `${alreadyEnrolledCount} student(s) already enrolled.`;
+        }
+        if (failureCount > 0) {
+          description += description ? ` ${failureCount} enrollment(s) failed.` : `${failureCount} enrollment(s) failed.`;
+        }
+
+        if (successCount > 0) {
+          toast({ 
+            title: `Bulk enrollment completed`,
+            description: description || 'Process completed'
+          });
+        } else {
+          toast({ 
+            title: 'Bulk enrollment failed',
+            description: description || 'No students were enrolled',
+            variant: 'destructive'
+          });
+          return;
         }
       }
-
-      toast({ 
-        title: 'Enrollment successful!',
-        description: selectedTeacher 
-          ? 'Student enrolled and teacher assigned' 
-          : 'Student enrolled successfully'
-      });
       
+      // Reset form and close dialog
       setEnrollDialogOpen(false);
       setSelectedStudent('');
+      setSelectedStudentsForEnrollment(new Set());
       setSelectedCourse('');
       setSelectedTeacher('');
       setExistingCoursesForStudent([]);
+      setEnrollmentMode('single');
       fetchData();
     } catch (error: any) {
       console.error('Enrollment error:', error);
-      toast({ title: 'Failed to enroll student', description: error.message, variant: 'destructive' });
+      toast({ 
+        title: enrollmentMode === 'single' ? 'Failed to enroll student' : 'Failed to enroll students', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
     } finally {
       setIsCreatingEnrollment(false);
     }
@@ -760,73 +890,185 @@ export default function EnrollmentManagement() {
                     Create New Enrollment
                   </DialogTitle>
                   <DialogDescription>
-                    Enroll a student in a course and optionally assign a teacher
+                    {enrollmentMode === 'single' 
+                      ? 'Enroll a student in a course and optionally assign a teacher'
+                      : 'Enroll multiple students in a course and optionally assign a teacher'}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-5 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="student-select" className="text-sm font-semibold flex items-center gap-2">
-                      <Users className="h-4 w-4 text-primary" />
-                      Select Student *
+                  {/* Enrollment Mode Selector */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-primary" />
+                      Enrollment Mode
                     </Label>
-                    <Select 
-                      value={selectedStudent} 
-                      onValueChange={async (value) => {
-                        setSelectedStudent(value);
-                        setSelectedCourse('');
-                        // Fetch existing courses for this student
-                        if (value) {
-                          const { data: existingEnrollments } = await supabase
-                            .from('course_enrollments')
-                            .select('course_id, courses(title)')
-                            .eq('user_id', value);
-                          
-                          if (existingEnrollments) {
-                            setExistingCoursesForStudent(existingEnrollments.map((e: any) => e.course_id));
-                            if (existingEnrollments.length > 0) {
-                              const courseTitles = existingEnrollments.map((e: any) => e.courses?.title || 'Unknown').join(', ');
-                              toast({
-                                title: 'Student already enrolled',
-                                description: `Current courses: ${courseTitles}. You can add more courses below.`,
-                              });
-                            }
-                          }
-                        } else {
-                          setExistingCoursesForStudent([]);
-                        }
+                    <RadioGroup 
+                      value={enrollmentMode} 
+                      onValueChange={(value) => {
+                        setEnrollmentMode(value as 'single' | 'bulk');
+                        // Reset selections when mode changes
+                        setSelectedStudent('');
+                        setSelectedStudentsForEnrollment(new Set());
+                        setExistingCoursesForStudent([]);
                       }}
+                      className="grid grid-cols-2 gap-4"
                     >
-                      <SelectTrigger id="student-select" className="h-11">
-                        <SelectValue placeholder="Choose a student..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <ScrollArea className="h-[200px]">
-                          {students.length === 0 ? (
-                            <div className="p-4 text-center text-sm text-muted-foreground">
-                              No students found
-                            </div>
-                          ) : (
-                            students.map((student) => (
-                              <SelectItem key={student.id} value={student.id}>
-                                <div className="flex items-center gap-2">
-                                  <Users className="h-3 w-3 text-muted-foreground" />
-                                  {student.full_name}
-                                </div>
-                              </SelectItem>
-                            ))
-                          )}
-                        </ScrollArea>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {students.length} student(s) available
-                      {selectedStudent && existingCoursesForStudent.length > 0 && (
-                        <span className="block mt-1 text-primary">
-                          Already enrolled in {existingCoursesForStudent.length} course(s)
-                        </span>
-                      )}
-                    </p>
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                        <RadioGroupItem value="single" id="mode-single" />
+                        <Label htmlFor="mode-single" className="cursor-pointer flex-1">
+                          <div className="font-medium">Single Student</div>
+                          <div className="text-xs text-muted-foreground">Enroll one student</div>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                        <RadioGroupItem value="bulk" id="mode-bulk" />
+                        <Label htmlFor="mode-bulk" className="cursor-pointer flex-1">
+                          <div className="font-medium">Bulk Enrollment</div>
+                          <div className="text-xs text-muted-foreground">Enroll multiple students</div>
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
+                  {/* Student Selection - Conditional based on mode */}
+                  {enrollmentMode === 'single' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="student-select" className="text-sm font-semibold flex items-center gap-2">
+                        <Users className="h-4 w-4 text-primary" />
+                        Select Student *
+                      </Label>
+                      <Select 
+                        value={selectedStudent} 
+                        onValueChange={async (value) => {
+                          setSelectedStudent(value);
+                          setSelectedCourse('');
+                          // Fetch existing courses for this student
+                          if (value) {
+                            const { data: existingEnrollments } = await supabase
+                              .from('course_enrollments')
+                              .select('course_id, courses(title)')
+                              .eq('user_id', value);
+                            
+                            if (existingEnrollments) {
+                              setExistingCoursesForStudent(existingEnrollments.map((e: any) => e.course_id));
+                              if (existingEnrollments.length > 0) {
+                                const courseTitles = existingEnrollments.map((e: any) => e.courses?.title || 'Unknown').join(', ');
+                                toast({
+                                  title: 'Student already enrolled',
+                                  description: `Current courses: ${courseTitles}. You can add more courses below.`,
+                                });
+                              }
+                            }
+                          } else {
+                            setExistingCoursesForStudent([]);
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="student-select" className="h-11">
+                          <SelectValue placeholder="Choose a student..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <ScrollArea className="h-[200px]">
+                            {students.length === 0 ? (
+                              <div className="p-4 text-center text-sm text-muted-foreground">
+                                No students found
+                              </div>
+                            ) : (
+                              students.map((student) => (
+                                <SelectItem key={student.id} value={student.id}>
+                                  <div className="flex items-center gap-2">
+                                    <Users className="h-3 w-3 text-muted-foreground" />
+                                    {student.full_name}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
+                          </ScrollArea>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {students.length} student(s) available
+                        {selectedStudent && existingCoursesForStudent.length > 0 && (
+                          <span className="block mt-1 text-primary">
+                            Already enrolled in {existingCoursesForStudent.length} course(s)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold flex items-center gap-2">
+                          <Users className="h-4 w-4 text-primary" />
+                          Select Students *
+                        </Label>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setSelectedStudentsForEnrollment(new Set(students.map(s => s.id)));
+                            }}
+                          >
+                            Select All
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setSelectedStudentsForEnrollment(new Set());
+                            }}
+                          >
+                            Clear All
+                          </Button>
+                        </div>
+                      </div>
+                      <ScrollArea className="h-[250px] border rounded-md p-4">
+                        {students.length === 0 ? (
+                          <div className="text-center text-sm text-muted-foreground py-8">
+                            No students found
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {students.map((student) => (
+                              <div key={student.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`student-enroll-${student.id}`}
+                                  checked={selectedStudentsForEnrollment.has(student.id)}
+                                  onCheckedChange={(checked) => {
+                                    const newSelection = new Set(selectedStudentsForEnrollment);
+                                    if (checked) {
+                                      newSelection.add(student.id);
+                                    } else {
+                                      newSelection.delete(student.id);
+                                    }
+                                    setSelectedStudentsForEnrollment(newSelection);
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`student-enroll-${student.id}`}
+                                  className="text-sm font-normal cursor-pointer flex-1"
+                                >
+                                  {student.full_name}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                      <p className="text-xs text-muted-foreground">
+                        {students.length} student(s) available
+                        {selectedStudentsForEnrollment.size > 0 && (
+                          <span className="block mt-1 text-primary">
+                            {selectedStudentsForEnrollment.size} student(s) selected
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="course-select" className="text-sm font-semibold flex items-center gap-2">
@@ -845,7 +1087,8 @@ export default function EnrollmentManagement() {
                             </div>
                           ) : (
                             courses.map((course) => {
-                              const isAlreadyEnrolled = existingCoursesForStudent.includes(course.id);
+                              // In bulk mode, don't disable courses based on single student's existing enrollments
+                              const isAlreadyEnrolled = enrollmentMode === 'single' && existingCoursesForStudent.includes(course.id);
                               return (
                                 <SelectItem 
                                   key={course.id} 
@@ -910,20 +1153,18 @@ export default function EnrollmentManagement() {
                 <DialogFooter className="gap-2 sm:gap-0">
                   <Button 
                     variant="outline" 
-                    onClick={() => {
-                      setEnrollDialogOpen(false);
-                      setSelectedStudent('');
-                      setSelectedCourse('');
-                      setSelectedTeacher('');
-                      setExistingCoursesForStudent([]);
-                    }}
+                    onClick={() => setEnrollDialogOpen(false)}
                     disabled={isCreatingEnrollment}
                   >
                     Cancel
                   </Button>
                   <Button 
                     onClick={handleCreateEnrollment}
-                    disabled={isCreatingEnrollment || !selectedStudent || !selectedCourse}
+                    disabled={
+                      isCreatingEnrollment || 
+                      !selectedCourse || 
+                      (enrollmentMode === 'single' ? !selectedStudent : selectedStudentsForEnrollment.size === 0)
+                    }
                   >
                     {isCreatingEnrollment ? (
                       <>
@@ -933,7 +1174,7 @@ export default function EnrollmentManagement() {
                     ) : (
                       <>
                         <UserPlus className="mr-2 h-4 w-4" />
-                        Enroll Student
+                        {enrollmentMode === 'single' ? 'Enroll Student' : 'Enroll Students'}
                       </>
                     )}
                   </Button>

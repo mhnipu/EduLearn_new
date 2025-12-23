@@ -151,47 +151,59 @@ const TeacherDashboard = () => {
 
   const fetchTeacherData = async () => {
     try {
-      // Fetch teacher's created courses
-      const { data: createdCourses } = await supabase
+      setLoadingData(true);
+      
+      // Fetch teacher's created courses (direct query - should work via RLS)
+      const { data: createdCourses, error: createdError } = await supabase
         .from('courses')
         .select('*')
         .eq('created_by', user?.id)
         .order('created_at', { ascending: false });
 
-      // Fetch courses assigned to teacher
-      let assignedCourses: any[] = [];
-      try {
-        const { data } = await supabase
-          .from('teacher_course_assignments' as any)
-          .select(`
-            course_id,
-            courses (
-              id,
-              title,
-              description,
-              thumbnail_url,
-              created_by,
-              created_at,
-              updated_at
-            )
-          `)
-          .eq('teacher_id', user?.id);
-        
-        assignedCourses = data || [];
-      } catch (error) {
-        console.log('Teacher course assignments table not yet available:', error);
+      if (createdError) {
+        console.error('Error fetching created courses:', createdError);
       }
 
+      // Fetch courses assigned to teacher using RPC function (bypasses RLS)
+      let assignedCoursesData: any[] = [];
+      try {
+        const { data: assignedData, error: assignedError } = await supabase
+          .rpc('get_teacher_assigned_courses', { _teacher_id: user?.id });
+
+        if (assignedError) {
+          console.error('Error fetching assigned courses via RPC:', assignedError);
+        } else {
+          assignedCoursesData = assignedData || [];
+        }
+      } catch (error) {
+        console.error('Error calling get_teacher_assigned_courses:', error);
+      }
+
+      // Normalize assigned courses (RPC returns course_id, not id, and assigned_at instead of created_at)
+      const normalizedAssignedCourses = assignedCoursesData.map((ac: any) => ({
+        id: ac.course_id, // Map course_id to id for consistency
+        title: ac.title || '',
+        description: ac.description || '',
+        created_at: ac.assigned_at || new Date().toISOString(), // Use assigned_at as created_at fallback
+        thumbnail_url: ac.thumbnail_url || null, // Preserve thumbnail_url if present
+      }));
+
       // Combine and deduplicate courses
-      const createdCoursesMap = new Map((createdCourses || []).map(c => [c.id, c]));
+      const coursesMap = new Map<string, Course>();
       
-      assignedCourses.forEach((ac: any) => {
-        if (ac.courses && !createdCoursesMap.has(ac.courses.id)) {
-          createdCoursesMap.set(ac.courses.id, ac.courses);
+      // Add created courses
+      (createdCourses || []).forEach((course: any) => {
+        coursesMap.set(course.id, course);
+      });
+      
+      // Add assigned courses (only if not already in map)
+      normalizedAssignedCourses.forEach((course: any) => {
+        if (!coursesMap.has(course.id)) {
+          coursesMap.set(course.id, course);
         }
       });
 
-      const allCourses = Array.from(createdCoursesMap.values());
+      const allCourses = Array.from(coursesMap.values());
       setCourses(allCourses);
 
       // Fetch stats
@@ -248,6 +260,14 @@ const TeacherDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching teacher data:', error);
+      // Set empty state on error to prevent UI from showing stale data
+      setCourses([]);
+      setStats({
+        myCourses: 0,
+        totalLessons: 0,
+        totalStudents: 0,
+      });
+      setCourseStats([]);
     } finally {
       setLoadingData(false);
     }
@@ -256,7 +276,7 @@ const TeacherDashboard = () => {
   const fetchEnrolledStudents = async () => {
     try {
       // Get all course IDs for teacher
-      const courseIds = courses.map(c => c.id);
+      const courseIds = courses.map(c => c.id).filter(Boolean) as string[];
       if (!courseIds || courseIds.length === 0) {
         setEnrolledStudents([]);
         return;

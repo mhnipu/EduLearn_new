@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   BookOpen, Video, Download, ExternalLink, FileText, 
-  Clock, Eye, Library, Lock
+  Clock, Eye, Library, Lock, Loader2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface LibraryBook {
   id: string;
@@ -130,7 +131,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600 dark:text-orange-400" />
       </div>
     );
   }
@@ -140,11 +141,13 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
   // Show resources even if not enrolled (but with message)
   if (!hasResources) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <Library className="h-16 w-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Resources Available</h3>
-          <p className="text-muted-foreground text-center max-w-md">
+      <Card className="border-orange-200 dark:border-orange-800">
+        <CardContent className="flex flex-col items-center justify-center py-16 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+          <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+            <Library className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2 text-foreground">No Resources Available</h3>
+          <p className="text-orange-700 dark:text-orange-300 font-medium text-center max-w-md">
             {isEnrolled 
               ? "This course doesn't have any additional resources attached yet. Check back later!"
               : "Please enroll in this course to access resources when they become available."}
@@ -157,9 +160,9 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
   return (
     <div className="space-y-6">
       {!isEnrolled && (
-        <Card className="bg-course-detail/50 border-amber-500/30">
+        <Card className="bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+            <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300 font-medium">
               <Lock className="h-4 w-4" />
               <span>Enroll in this course to access all resources</span>
             </div>
@@ -169,19 +172,25 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
       
       {/* Books */}
       {books.length > 0 && (
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+              <BookOpen className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               Reading Materials ({books.length})
             </CardTitle>
-            <CardDescription>Books and documents for this course</CardDescription>
+            <CardDescription className="text-orange-600 dark:text-orange-400">Books and documents for this course</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {books.map((book) => (
-                <Card key={book.id} className="overflow-hidden">
-                  <div className="aspect-[3/4] bg-course-detail relative">
+                <Card 
+                  key={book.id} 
+                  className={cn(
+                    "overflow-hidden border-orange-200 dark:border-orange-800",
+                    "hover:shadow-xl transition-all duration-300"
+                  )}
+                >
+                  <div className="aspect-[3/4] bg-orange-50 dark:bg-orange-900/20 relative">
                     {book.thumbnail_url ? (
                       <img 
                         src={book.thumbnail_url} 
@@ -189,25 +198,30 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                        <FileText className="h-12 w-12 text-primary/50" />
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-500/20 to-orange-600/10">
+                        <FileText className="h-12 w-12 text-orange-600/50 dark:text-orange-400/50" />
                       </div>
                     )}
                   </div>
                   <CardContent className="p-4">
-                    <h4 className="font-medium text-sm line-clamp-2">{book.title}</h4>
+                    <h4 className="font-medium text-sm line-clamp-2 text-foreground">{book.title}</h4>
                     {book.author && (
-                      <p className="text-xs text-muted-foreground mt-1">{book.author}</p>
+                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-1 font-medium">{book.author}</p>
                     )}
                     <div className="flex items-center gap-2 mt-3">
                       {book.page_count && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
                           {book.page_count} pages
                         </Badge>
                       )}
                     </div>
                     {isEnrolled ? (
-                      <Button asChild variant="outline" size="sm" className="w-full mt-3">
+                      <Button 
+                        asChild 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-3 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                      >
                         <a href={book.pdf_url} target="_blank" rel="noopener noreferrer">
                           <Download className="mr-2 h-3 w-3" />
                           Download
@@ -229,19 +243,25 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
 
       {/* Videos */}
       {videos.length > 0 && (
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Video className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+              <Video className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               Video Resources ({videos.length})
             </CardTitle>
-            <CardDescription>Additional video content for this course</CardDescription>
+            <CardDescription className="text-orange-600 dark:text-orange-400">Additional video content for this course</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {videos.map((video) => (
-                <Card key={video.id} className="overflow-hidden">
-                  <div className="aspect-video bg-course-detail relative">
+                <Card 
+                  key={video.id} 
+                  className={cn(
+                    "overflow-hidden border-orange-200 dark:border-orange-800",
+                    "hover:shadow-xl transition-all duration-300"
+                  )}
+                >
+                  <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 relative">
                     {video.thumbnail_url ? (
                       <img 
                         src={video.thumbnail_url} 
@@ -249,23 +269,28 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                        <Video className="h-12 w-12 text-primary/50" />
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-500/20 to-orange-600/10">
+                        <Video className="h-12 w-12 text-orange-600/50 dark:text-orange-400/50" />
                       </div>
                     )}
                   </div>
                   <CardContent className="p-4">
-                    <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
+                    <h4 className="font-medium text-sm line-clamp-2 text-foreground">{video.title}</h4>
                     <div className="flex items-center gap-2 mt-3">
                       {video.duration_minutes && (
-                        <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                        <Badge variant="secondary" className="text-xs flex items-center gap-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
                           <Clock className="h-3 w-3" />
                           {video.duration_minutes} min
                         </Badge>
                       )}
                     </div>
                     {isEnrolled ? (
-                      <Button asChild variant="outline" size="sm" className="w-full mt-3">
+                      <Button 
+                        asChild 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-3 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                      >
                         <a href={video.youtube_url} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="mr-2 h-3 w-3" />
                           Watch

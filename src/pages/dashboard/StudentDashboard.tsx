@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   BookOpen, Award, Clock, Bookmark, Play, Library, FileText, TrendingUp, Target, CheckCircle2, 
   Zap, Star, Trophy, GraduationCap, ClipboardList, MessageSquare, Search, Filter, 
-  AlertCircle, Loader2, Book, Video, Calendar, ExternalLink, ChevronRight, ArrowRight
+  AlertCircle, Loader2, Book, Video, Calendar, ExternalLink, ChevronRight, ArrowRight,
+  UserCheck, Mail, Phone
 } from 'lucide-react';
 import {
   RadialBarChart, RadialBar, PieChart as RechartsPieChart, Pie, Cell,
@@ -32,6 +33,15 @@ interface EnrolledCourse {
     description: string;
     thumbnail_url: string;
   };
+  teacher?: {
+    teacher_id: string;
+    teacher_name: string;
+    teacher_email: string;
+    teacher_phone: string;
+  };
+  progress?: number;
+  totalItems?: number;
+  completedItems?: number;
 }
 
 interface BookmarkItem {
@@ -155,12 +165,12 @@ const StudentDashboard = () => {
         .eq('user_id', user?.id)
         .order('enrolled_at', { ascending: false });
 
-      // Calculate actual progress for each course
+      // Calculate actual progress and fetch teacher info for each course
       if (enrollments && user) {
         const coursesWithProgress = await Promise.all(
           enrollments.map(async (enrollment) => {
             // Get total lessons and materials for this course
-            const [lessonsResult, materialsResult] = await Promise.all([
+            const [lessonsResult, materialsResult, teacherResult] = await Promise.all([
               supabase
                 .from('lessons')
                 .select('id', { count: 'exact', head: true })
@@ -169,6 +179,8 @@ const StudentDashboard = () => {
                 .from('course_materials')
                 .select('id', { count: 'exact', head: true })
                 .eq('course_id', enrollment.course_id),
+              supabase
+                .rpc('get_course_primary_teacher', { _course_id: enrollment.course_id }),
             ]);
 
             const totalItems = (lessonsResult.count || 0) + (materialsResult.count || 0);
@@ -188,11 +200,22 @@ const StudentDashboard = () => {
               ? Math.round(((completedCount || 0) / totalItems) * 100)
               : 0;
 
+            // Extract teacher info if available
+            const teacher = teacherResult.data && teacherResult.data.length > 0
+              ? {
+                  teacher_id: teacherResult.data[0].teacher_id,
+                  teacher_name: teacherResult.data[0].teacher_name || 'No teacher assigned',
+                  teacher_email: teacherResult.data[0].teacher_email || '',
+                  teacher_phone: teacherResult.data[0].teacher_phone || '',
+                }
+              : undefined;
+
             return {
               ...enrollment,
               progress: Math.min(progress, 100),
               totalItems,
               completedItems: completedCount || 0,
+              teacher,
             };
           })
         );
@@ -1057,9 +1080,31 @@ const StudentDashboard = () => {
                         <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-primary transition-colors">
                           {enrollment.courses.title}
                         </h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                           {enrollment.courses.description || 'No description available'}
                         </p>
+                        {/* Teacher Information */}
+                        {enrollment.teacher && (
+                          <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+                            <div className="flex items-center gap-2 mb-2">
+                              <UserCheck className="h-4 w-4 text-primary" />
+                              <span className="text-xs font-semibold text-muted-foreground">Assigned Teacher</span>
+                            </div>
+                            <p className="text-sm font-medium">{enrollment.teacher.teacher_name}</p>
+                            {enrollment.teacher.teacher_email && (
+                              <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                                <Mail className="h-3 w-3" />
+                                <span className="truncate">{enrollment.teacher.teacher_email}</span>
+                              </div>
+                            )}
+                            {enrollment.teacher.teacher_phone && (
+                              <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                                <Phone className="h-3 w-3" />
+                                <span>{enrollment.teacher.teacher_phone}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       
                       <div className="space-y-2">

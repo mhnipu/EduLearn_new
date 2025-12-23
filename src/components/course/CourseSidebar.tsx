@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface CourseSidebarProps {
   course: {
@@ -64,7 +65,10 @@ export function CourseSidebar({
   const isInstructor = role === 'admin' || role === 'super_admin' || role === 'teacher';
 
   return (
-    <Card className="sticky top-4 overflow-hidden">
+    <Card className={cn(
+      "sticky top-4 overflow-hidden border-orange-200 dark:border-orange-800",
+      "hover:shadow-xl transition-all duration-300"
+    )}>
       {course.thumbnail_url ? (
         <div className="relative">
           <img 
@@ -75,8 +79,8 @@ export function CourseSidebar({
           <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
         </div>
       ) : (
-        <div className="w-full aspect-video bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-          <GraduationCap className="h-16 w-16 text-primary/50" />
+        <div className="w-full aspect-video bg-gradient-to-br from-orange-500/20 to-orange-600/10 flex items-center justify-center border-b border-orange-200 dark:border-orange-800">
+          <GraduationCap className="h-16 w-16 text-orange-600/50 dark:text-orange-400/50" />
         </div>
       )}
       
@@ -131,7 +135,7 @@ export function CourseSidebar({
             <Button 
               onClick={() => navigate(`/admin/courses/${course.id}/edit`)} 
               variant="outline" 
-              className="w-full"
+              className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
             >
               <Edit className="mr-2 h-4 w-4" />
               Edit Course
@@ -139,7 +143,7 @@ export function CourseSidebar({
             <Button 
               onClick={() => navigate(`/admin/courses/${course.id}/modules`)} 
               variant="outline" 
-              className="w-full"
+              className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
             >
               <Settings className="mr-2 h-4 w-4" />
               Manage Structure
@@ -147,7 +151,7 @@ export function CourseSidebar({
             <Button 
               onClick={() => navigate(`/admin/courses/${course.id}/materials`)} 
               variant="outline" 
-              className="w-full"
+              className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
             >
               <BookOpen className="mr-2 h-4 w-4" />
               Manage Materials
@@ -155,36 +159,36 @@ export function CourseSidebar({
           </div>
         )}
 
-        <Separator />
+        <Separator className="bg-orange-200 dark:bg-orange-800" />
 
         {/* Course Stats */}
         <div className="space-y-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground flex items-center gap-2">
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-900/20">
+            <span className="text-orange-700 dark:text-orange-300 flex items-center gap-2 font-medium">
               <BookOpen className="h-4 w-4" />
               Lessons
             </span>
-            <span className="font-medium">{totalItems}</span>
+            <span className="font-semibold text-orange-600 dark:text-orange-400">{totalItems}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground flex items-center gap-2">
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-900/20">
+            <span className="text-orange-700 dark:text-orange-300 flex items-center gap-2 font-medium">
               <Users className="h-4 w-4" />
               Students
             </span>
-            <span className="font-medium">
+            <span className="font-semibold text-orange-600 dark:text-orange-400">
               {enrollmentCount}
               {course.max_capacity && (
-                <span className="text-muted-foreground"> / {course.max_capacity}</span>
+                <span className="text-orange-500 dark:text-orange-400 font-normal"> / {course.max_capacity}</span>
               )}
             </span>
           </div>
           {course.max_capacity && (
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground flex items-center gap-2">
+            <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-900/20">
+              <span className="text-orange-700 dark:text-orange-300 flex items-center gap-2 font-medium">
                 <BarChart3 className="h-4 w-4" />
                 Availability
               </span>
-              <span className={`font-medium ${isCourseFull ? 'text-chart-1' : 'text-chart-1'}`}>
+              <span className={`font-semibold ${isCourseFull ? 'text-orange-600 dark:text-orange-400' : 'text-orange-600 dark:text-orange-400'}`}>
                 {isCourseFull ? 'Full' : `${course.max_capacity - enrollmentCount} spots left`}
               </span>
             </div>
@@ -192,13 +196,19 @@ export function CourseSidebar({
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" size="sm" onClick={handleShare}>
+          <Button 
+            variant="outline" 
+            className="flex-1 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30" 
+            size="sm" 
+            onClick={handleShare}
+          >
             <Share2 className="mr-2 h-4 w-4" />
             Share
           </Button>
           <Button 
             variant="outline" 
-            size="sm" 
+            size="sm"
+            className="border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
               toast({ title: 'Link copied!' });

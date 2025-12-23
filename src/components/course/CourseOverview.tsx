@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Target, Users, Award, Clock, BookOpen } from 'lucide-react';
 import { RatingBreakdown } from '@/components/StarRating';
+import { cn } from '@/lib/utils';
 
 interface Lesson {
   id: string;
@@ -54,10 +55,10 @@ export function CourseOverview({
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-6">
         {/* What You'll Learn */}
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+              <Target className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               What You'll Learn
             </CardTitle>
           </CardHeader>
@@ -65,12 +66,12 @@ export function CourseOverview({
             <ul className="space-y-3">
               {learningObjectives.map((objective, i) => (
                 <li key={i} className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                  <span className="text-sm">{objective}</span>
+                  <CheckCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
+                  <span className="text-sm text-foreground">{objective}</span>
                 </li>
               ))}
               {lessons.length > 6 && (
-                <li className="text-muted-foreground pl-8 text-sm">
+                <li className="text-orange-600 dark:text-orange-400 pl-8 text-sm font-medium">
                   + {lessons.length - 6} more topics
                 </li>
               )}
@@ -79,29 +80,29 @@ export function CourseOverview({
         </Card>
 
         {/* Course Statistics */}
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+              <Award className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               Course Statistics
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-course-detail/50 rounded-lg">
-                <BookOpen className="h-6 w-6 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold text-primary">{totalItems}</p>
-                <p className="text-xs text-muted-foreground">Total Lessons</p>
+              <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                <BookOpen className="h-6 w-6 text-orange-600 dark:text-orange-400 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{totalItems}</p>
+                <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">Total Lessons</p>
               </div>
-              <div className="text-center p-4 bg-course-detail/50 rounded-lg">
-                <Users className="h-6 w-6 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold text-primary">{enrollmentCount}</p>
-                <p className="text-xs text-muted-foreground">Students</p>
+              <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                <Users className="h-6 w-6 text-orange-600 dark:text-orange-400 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{enrollmentCount}</p>
+                <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">Students</p>
               </div>
             </div>
             {averageRating > 0 && (
-              <div className="pt-4 border-t">
-                <h4 className="font-medium mb-3 text-sm">Rating Distribution</h4>
+              <div className="pt-4 border-t border-orange-200 dark:border-orange-800">
+                <h4 className="font-semibold mb-3 text-sm text-orange-700 dark:text-orange-300">Rating Distribution</h4>
                 <RatingBreakdown ratings={ratingBreakdown} totalRatings={totalRatings} />
               </div>
             )}
@@ -111,15 +112,15 @@ export function CourseOverview({
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Prerequisites */}
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
-            <CardTitle className="text-lg">Prerequisites</CardTitle>
+            <CardTitle className="text-lg text-orange-700 dark:text-orange-300">Prerequisites</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
               {getPrerequisites().map((prereq, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                <li key={i} className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300">
+                  <div className="h-1.5 w-1.5 rounded-full bg-orange-600 dark:bg-orange-400" />
                   {prereq}
                 </li>
               ))}
@@ -128,21 +129,23 @@ export function CourseOverview({
         </Card>
 
         {/* Course Info */}
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
-            <CardTitle className="text-lg">Course Information</CardTitle>
+            <CardTitle className="text-lg text-orange-700 dark:text-orange-300">Course Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {course.difficulty && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Difficulty</span>
-                <Badge variant="outline" className="capitalize">{course.difficulty}</Badge>
+                <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">Difficulty</span>
+                <Badge variant="outline" className="capitalize bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                  {course.difficulty}
+                </Badge>
               </div>
             )}
             {course.estimated_duration_minutes && course.estimated_duration_minutes > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Duration</span>
-                <span className="text-sm font-medium flex items-center gap-1">
+                <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">Duration</span>
+                <span className="text-sm font-semibold text-orange-700 dark:text-orange-300 flex items-center gap-1">
                   <Clock className="h-4 w-4" />
                   {Math.round(course.estimated_duration_minutes / 60)} hours
                 </span>
@@ -150,13 +153,13 @@ export function CourseOverview({
             )}
             {instructorName && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Instructor</span>
-                <span className="text-sm font-medium">{instructorName}</span>
+                <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">Instructor</span>
+                <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">{instructorName}</span>
               </div>
             )}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Certificate</span>
-              <Badge variant="secondary" className="text-xs">
+              <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">Certificate</span>
+              <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
                 <Award className="h-3 w-3 mr-1" />
                 On Completion
               </Badge>

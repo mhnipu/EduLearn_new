@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BookOpen, Search, Filter, Star, Users, Clock, User, Plus } from 'lucide-react';
+import { BookOpen, Search, Filter, Star, Users, Clock, User, Plus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { StarRating } from '@/components/StarRating';
+import { BackButton } from '@/components/BackButton';
+import { cn } from '@/lib/utils';
 
 interface Category {
   id: string;
@@ -227,31 +229,42 @@ export default function Courses() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading courses...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600 dark:text-orange-400" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-bold mb-2">Explore Courses</h1>
-          <p className="text-muted-foreground text-lg">
-            Discover and learn from our collection of courses
-          </p>
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <BackButton 
+              fallbackPath="/dashboard"
+              fallbackLabel="Back to Dashboard"
+              size="icon"
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <BookOpen className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                Explore Courses
+              </h1>
+              <p className="text-orange-600 dark:text-orange-400 mt-1 font-medium">
+                Discover and learn from our collection of courses
+              </p>
+            </div>
+          </div>
+          {(role === 'admin' || role === 'super_admin') && (
+            <Button 
+              onClick={() => navigate('/admin/course-wizard')} 
+              className="shrink-0 bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Course
+            </Button>
+          )}
         </div>
-        {(role === 'admin' || role === 'super_admin') && (
-          <Button onClick={() => navigate('/admin/course-wizard')} className="shrink-0">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Course
-          </Button>
-        )}
-      </div>
 
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
@@ -313,21 +326,23 @@ export default function Courses() {
         Showing {filteredCourses.length} of {courses.length} courses
       </p>
 
-      {/* Courses Grid */}
-      {filteredCourses.length === 0 ? (
-        <Card className="border-2 border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <BookOpen className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No courses found</h3>
-            <p className="text-muted-foreground text-center max-w-md">
-              {searchQuery || selectedCategory !== 'all'
-                ? "Try adjusting your search or filter criteria"
-                : "No courses available yet. Check back soon!"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Courses Grid */}
+        {filteredCourses.length === 0 ? (
+          <Card className="border-orange-200 dark:border-orange-800">
+            <CardContent className="py-16 text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+              <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                <BookOpen className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">No courses found</h3>
+              <p className="text-orange-700 dark:text-orange-300 font-medium text-center max-w-md">
+                {searchQuery || selectedCategory !== 'all'
+                  ? "Try adjusting your search or filter criteria"
+                  : "No courses available yet. Check back soon!"}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCourses.map((course) => (
             <Card
               key={course.id}
@@ -380,10 +395,10 @@ export default function Courses() {
               </div>
 
               <CardHeader className="pb-2">
-                <CardTitle className="group-hover:text-primary transition-colors line-clamp-2">
+                <CardTitle className="group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors line-clamp-2">
                   {course.title}
                 </CardTitle>
-                <CardDescription className="line-clamp-2">
+                <CardDescription className="line-clamp-2 text-foreground/70">
                   {course.description || 'No description available'}
                 </CardDescription>
               </CardHeader>
@@ -401,15 +416,15 @@ export default function Courses() {
                   </div>
                   
                   {/* Duration & Enrollment */}
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-3 text-sm text-orange-700 dark:text-orange-300">
                     {course.estimated_duration_minutes && course.estimated_duration_minutes > 0 && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-100 dark:bg-orange-900/30 font-medium">
                         <Clock className="h-3.5 w-3.5" />
                         <span>{Math.floor(course.estimated_duration_minutes / 60)}h {course.estimated_duration_minutes % 60}m</span>
                       </div>
                     )}
                     {course.enrollmentCount !== undefined && course.enrollmentCount > 0 && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-100 dark:bg-orange-900/30 font-medium">
                         <Users className="h-3.5 w-3.5" />
                         <span>{course.enrollmentCount}</span>
                       </div>
@@ -419,23 +434,27 @@ export default function Courses() {
                 
                 {/* Instructor */}
                 {course.instructor_name && (
-                  <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5 mt-2 text-sm text-orange-700 dark:text-orange-300">
                     <User className="h-3.5 w-3.5" />
-                    <span>{course.instructor_name}</span>
+                    <span className="font-medium">{course.instructor_name}</span>
                   </div>
                 )}
               </CardContent>
 
               <CardFooter className="pt-2">
-                <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 font-semibold transition-all group-hover:shadow-md"
+                >
                   View Course
                   <BookOpen className="ml-2 h-4 w-4" />
                 </Button>
               </CardFooter>
             </Card>
           ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   Video, FileText, CheckCircle, Clock, Download, Play, Lock, BookOpen, Layers, ChevronRight
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 interface Module {
   id: string;
@@ -125,23 +126,26 @@ export function CourseCurriculum({
       {/* Video Player / Content Viewer */}
       <div className="lg:col-span-2 space-y-4">
         {selectedItem ? (
-          <Card className="shadow-lg">
-            <CardHeader className="pb-3 border-b">
+          <Card className={cn(
+            "shadow-xl border-orange-200 dark:border-orange-800",
+            "hover:shadow-2xl transition-all duration-300"
+          )}>
+            <CardHeader className="pb-3 border-b border-orange-200 dark:border-orange-800">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   {hasVideo(selectedItem) ? (
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Video className="h-5 w-5 text-primary" />
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                      <Video className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     </div>
                   ) : (
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <FileText className="h-5 w-5 text-primary" />
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                      <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     </div>
                   )}
                   <div>
-                    <CardTitle className="text-lg">{selectedItem.title}</CardTitle>
+                    <CardTitle className="text-lg text-foreground">{selectedItem.title}</CardTitle>
                     {selectedItem && 'material_type' in selectedItem && selectedItem.duration_minutes && (
-                      <CardDescription className="flex items-center gap-1 mt-1">
+                      <CardDescription className="flex items-center gap-1 mt-1 text-orange-700 dark:text-orange-300">
                         <Clock className="h-3 w-3" />
                         {selectedItem.duration_minutes} minutes
                       </CardDescription>
@@ -150,7 +154,11 @@ export function CourseCurriculum({
                 </div>
                 <div className="flex items-center gap-2">
                   {isEnrolled && !completedLessons.has(selectedItem.id) && (
-                    <Button size="sm" onClick={() => onMarkComplete(selectedItem.id)}>
+                    <Button 
+                      size="sm" 
+                      onClick={() => onMarkComplete(selectedItem.id)}
+                      className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                    >
                       <CheckCircle className="mr-2 h-4 w-4" />
                       Mark Complete
                     </Button>
@@ -195,14 +203,19 @@ export function CourseCurriculum({
                 if (pdfUrl) {
                   return (
                     <div className="space-y-4">
-                      <div className="aspect-video bg-course-detail rounded-lg overflow-hidden shadow-lg border">
+                      <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 rounded-lg overflow-hidden shadow-lg border border-orange-200 dark:border-orange-800">
                         <iframe
                           src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
                           className="w-full h-full"
                           title={selectedItem.title}
                         />
                       </div>
-                      <Button asChild variant="outline" className="w-full" size="lg">
+                      <Button 
+                        asChild 
+                        variant="outline" 
+                        className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30" 
+                        size="lg"
+                      >
                         <a href={pdfUrl} target="_blank" rel="noopener noreferrer" download>
                           <Download className="mr-2 h-4 w-4" />
                           Download PDF
@@ -212,10 +225,10 @@ export function CourseCurriculum({
                   );
                 }
                 return (
-                  <div className="aspect-video bg-course-detail rounded-lg flex items-center justify-center border-2 border-dashed">
+                  <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 rounded-lg flex items-center justify-center border-2 border-dashed border-orange-300 dark:border-orange-700">
                     <div className="text-center">
-                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-muted-foreground">No content available</p>
+                      <FileText className="h-12 w-12 text-orange-600 dark:text-orange-400 mx-auto mb-2" />
+                      <p className="text-orange-700 dark:text-orange-300 font-medium">No content available</p>
                     </div>
                   </div>
                 );
@@ -223,25 +236,28 @@ export function CourseCurriculum({
             </CardContent>
           </Card>
         ) : (
-          <Card className="shadow-lg">
-            <CardContent className="flex flex-col items-center justify-center py-20">
+          <Card className={cn(
+            "shadow-xl border-orange-200 dark:border-orange-800",
+            "hover:shadow-2xl transition-all duration-300"
+          )}>
+            <CardContent className="flex flex-col items-center justify-center py-20 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
               {!isEnrolled ? (
                 <>
-                  <div className="p-4 bg-course-detail rounded-full mb-4">
-                    <Lock className="h-12 w-12 text-muted-foreground" />
+                  <div className="p-4 bg-orange-100 dark:bg-orange-900/40 rounded-full mb-4">
+                    <Lock className="h-12 w-12 text-orange-600 dark:text-orange-400" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">Enroll to Access Content</h3>
-                  <p className="text-muted-foreground text-center max-w-md">
+                  <h3 className="text-xl font-semibold mb-2 text-foreground">Enroll to Access Content</h3>
+                  <p className="text-orange-700 dark:text-orange-300 font-medium text-center max-w-md">
                     Please enroll in this course to view lessons and materials. Once enrolled, you'll have full access to all course content.
                   </p>
                 </>
               ) : (
                 <>
-                  <div className="p-4 bg-primary/10 rounded-full mb-4">
-                    <Play className="h-12 w-12 text-primary" />
+                  <div className="p-4 bg-orange-100 dark:bg-orange-900/40 rounded-full mb-4">
+                    <Play className="h-12 w-12 text-orange-600 dark:text-orange-400" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">Select a Lesson to Begin</h3>
-                  <p className="text-muted-foreground text-center max-w-md">
+                  <h3 className="text-xl font-semibold mb-2 text-foreground">Select a Lesson to Begin</h3>
+                  <p className="text-orange-700 dark:text-orange-300 font-medium text-center max-w-md">
                     Choose a lesson or material from the course content panel to start learning
                   </p>
                 </>
@@ -253,24 +269,27 @@ export function CourseCurriculum({
 
       {/* Course Content Sidebar */}
       <div className="lg:col-span-1">
-        <Card className="sticky top-4 shadow-lg border-2">
-          <CardHeader className="pb-3 border-b bg-muted/50">
+        <Card className={cn(
+          "sticky top-4 shadow-xl border-2 border-orange-200 dark:border-orange-800",
+          "hover:shadow-2xl transition-all duration-300"
+        )}>
+          <CardHeader className="pb-3 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
             <div className="flex items-center gap-2 mb-2">
-              <Layers className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Course Content</CardTitle>
+              <Layers className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              <CardTitle className="text-lg text-orange-700 dark:text-orange-300">Course Content</CardTitle>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Progress</span>
-                <span className="font-semibold">{progressPercentage}%</span>
+                <span className="text-orange-600 dark:text-orange-400 font-medium">Progress</span>
+                <span className="font-semibold text-orange-700 dark:text-orange-300">{progressPercentage}%</span>
               </div>
-              <div className="w-full bg-course-detail rounded-full h-2">
+              <div className="w-full bg-orange-200 dark:bg-orange-800 rounded-full h-2">
                 <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  className="bg-orange-600 dark:bg-orange-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-xs text-orange-600 dark:text-orange-400 font-medium">
                 {completedCount} of {totalItems} items completed
               </CardDescription>
             </div>
@@ -289,13 +308,13 @@ export function CourseCurriculum({
                   return (
                     <Accordion key={module.id} type="single" collapsible className="w-full">
                       <AccordionItem value={module.id} className="border-0">
-                        <AccordionTrigger className="px-3 py-2.5 hover:no-underline bg-course-detail/50 rounded-lg hover:bg-course-detail transition-colors">
+                        <AccordionTrigger className="px-3 py-2.5 hover:no-underline bg-orange-50 dark:bg-orange-900/20 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border border-orange-200 dark:border-orange-800">
                           <div className="flex items-center justify-between w-full pr-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <Layers className="h-4 w-4 text-primary flex-shrink-0" />
+                              <Layers className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
                               <div className="flex-1 min-w-0 text-left">
-                                <p className="font-medium text-sm truncate">{module.title}</p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="font-medium text-sm truncate text-orange-700 dark:text-orange-300">{module.title}</p>
+                                <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
                                   {moduleLessons.length} {moduleLessons.length === 1 ? 'lesson' : 'lessons'} • {moduleProgress}% complete
                                 </p>
                               </div>
@@ -303,7 +322,7 @@ export function CourseCurriculum({
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="pt-2 pb-0">
-                          <div className="space-y-0.5 pl-2 border-l-2 border-muted">
+                          <div className="space-y-0.5 pl-2 border-l-2 border-orange-300 dark:border-orange-700">
                             {moduleLessons.map((lesson, index) => (
                               <button
                                 key={lesson.id}
@@ -312,20 +331,22 @@ export function CourseCurriculum({
                                   onSelectItem(lesson);
                                 }}
                                 disabled={!isEnrolled}
-                                className={`w-full p-3 text-left transition-all rounded-md flex items-center gap-3 ${
+                                className={cn(
+                                  "w-full p-3 text-left transition-all rounded-md flex items-center gap-3",
                                   selectedItem?.id === lesson.id 
-                                    ? 'bg-primary/10 border-l-2 border-l-primary shadow-sm' 
-                                    : isEnrolled ? 'hover:bg-accent cursor-pointer' : 'cursor-not-allowed opacity-60'
-                                }`}
+                                    ? 'bg-orange-100 dark:bg-orange-900/30 border-l-2 border-l-orange-600 dark:border-l-orange-500 shadow-sm' 
+                                    : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer' : 'cursor-not-allowed opacity-60'
+                                )}
                                 title={!isEnrolled ? 'Please enroll to access this lesson' : lesson.title}
                               >
-                                <div className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
+                                <div className={cn(
+                                  "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium",
                                   completedLessons.has(lesson.id) 
                                     ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-400' 
                                     : selectedItem?.id === lesson.id
-                                    ? 'bg-primary/20 border-primary text-primary'
-                                    : 'bg-background border-muted-foreground/30'
-                                }`}>
+                                    ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-600 dark:border-orange-500 text-orange-700 dark:text-orange-300'
+                                    : 'bg-background border-orange-200 dark:border-orange-800'
+                                )}>
                                   {completedLessons.has(lesson.id) ? (
                                     <CheckCircle className="h-4 w-4" />
                                   ) : !isEnrolled ? (
@@ -335,15 +356,15 @@ export function CourseCurriculum({
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{lesson.title}</p>
+                                  <p className="text-sm font-medium truncate text-foreground">{lesson.title}</p>
                                   {lesson.video_url && (
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                    <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1 mt-0.5 font-medium">
                                       <Video className="h-3 w-3" />
                                       Video
                                     </p>
                                   )}
                                   {lesson.pdf_url && !lesson.video_url && (
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                    <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1 mt-0.5 font-medium">
                                       <FileText className="h-3 w-3" />
                                       PDF
                                     </p>
@@ -360,11 +381,11 @@ export function CourseCurriculum({
 
                 {/* Ungrouped Lessons (no module) */}
                 {lessonsByModule.ungrouped.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 px-3 py-2">
-                      <Video className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">Other Lessons</span>
-                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <Video className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                        <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Other Lessons</span>
+                      </div>
                     <div className="space-y-0.5">
                       {lessonsByModule.ungrouped.map((lesson, index) => (
                         <button
@@ -374,20 +395,22 @@ export function CourseCurriculum({
                             onSelectItem(lesson);
                           }}
                           disabled={!isEnrolled}
-                          className={`w-full p-3 text-left transition-all rounded-md flex items-center gap-3 ${
+                          className={cn(
+                            "w-full p-3 text-left transition-all rounded-md flex items-center gap-3",
                             selectedItem?.id === lesson.id 
-                              ? 'bg-primary/10 border-l-2 border-l-primary shadow-sm' 
-                              : isEnrolled ? 'hover:bg-accent cursor-pointer' : 'cursor-not-allowed opacity-60'
-                          }`}
+                              ? 'bg-orange-100 dark:bg-orange-900/30 border-l-2 border-l-orange-600 dark:border-l-orange-500 shadow-sm' 
+                              : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer' : 'cursor-not-allowed opacity-60'
+                          )}
                           title={!isEnrolled ? 'Please enroll to access this lesson' : lesson.title}
                         >
-                          <div className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
+                          <div className={cn(
+                            "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium",
                             completedLessons.has(lesson.id) 
                               ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-400' 
                               : selectedItem?.id === lesson.id
-                              ? 'bg-primary/20 border-primary text-primary'
-                              : 'bg-background border-muted-foreground/30'
-                          }`}>
+                              ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-600 dark:border-orange-500 text-orange-700 dark:text-orange-300'
+                              : 'bg-background border-orange-200 dark:border-orange-800'
+                          )}>
                             {completedLessons.has(lesson.id) ? (
                               <CheckCircle className="h-4 w-4" />
                             ) : !isEnrolled ? (
@@ -399,13 +422,13 @@ export function CourseCurriculum({
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{lesson.title}</p>
                             {lesson.video_url && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1 mt-0.5 font-medium">
                                 <Video className="h-3 w-3" />
                                 Video
                               </p>
                             )}
                             {lesson.pdf_url && !lesson.video_url && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1 mt-0.5 font-medium">
                                 <FileText className="h-3 w-3" />
                                 PDF
                               </p>
@@ -420,11 +443,11 @@ export function CourseCurriculum({
                 {/* Materials Section */}
                 {materials.length > 0 && (
                   <>
-                    <Separator className="my-4" />
+                    <Separator className="my-4 bg-orange-200 dark:bg-orange-800" />
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 px-3 py-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium text-muted-foreground">Additional Materials</span>
+                        <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                        <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Additional Materials</span>
                       </div>
                       <div className="space-y-0.5">
                         {materials.map((material, index) => (
@@ -435,11 +458,12 @@ export function CourseCurriculum({
                               onSelectItem(material);
                             }}
                             disabled={!isEnrolled}
-                            className={`w-full p-3 text-left transition-all rounded-md flex items-center gap-3 ${
+                            className={cn(
+                              "w-full p-3 text-left transition-all rounded-md flex items-center gap-3",
                               selectedItem?.id === material.id 
-                                ? 'bg-primary/10 border-l-2 border-l-primary shadow-sm' 
-                                : isEnrolled ? 'hover:bg-accent cursor-pointer' : 'cursor-not-allowed opacity-60'
-                            }`}
+                                ? 'bg-orange-100 dark:bg-orange-900/30 border-l-2 border-l-orange-600 dark:border-l-orange-500 shadow-sm' 
+                                : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer' : 'cursor-not-allowed opacity-60'
+                            )}
                             title={!isEnrolled ? 'Please enroll to access this material' : material.title}
                           >
                             <div className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
@@ -460,7 +484,7 @@ export function CourseCurriculum({
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{material.title}</p>
                               {material.duration_minutes && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1 mt-0.5 font-medium">
                                   <Clock className="h-3 w-3" />
                                   {material.duration_minutes} min
                                 </p>
@@ -476,8 +500,8 @@ export function CourseCurriculum({
                 {/* Empty State */}
                 {totalItems === 0 && (
                   <div className="p-8 text-center">
-                    <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">No content available yet</p>
+                    <BookOpen className="h-12 w-12 text-orange-600 dark:text-orange-400 mx-auto mb-3" />
+                    <p className="text-sm text-orange-700 dark:text-orange-300 font-medium">No content available yet</p>
                   </div>
                 )}
               </div>

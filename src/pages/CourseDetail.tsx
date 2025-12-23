@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  ArrowLeft, BookOpen, MessageCircle, Users, BarChart3, Library
+  ArrowLeft, BookOpen, MessageCircle, Users, BarChart3, Library, Loader2
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -490,28 +490,32 @@ export default function CourseDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading course...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600 dark:text-orange-400" />
       </div>
     );
   }
 
   if (!course) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <h3 className="text-xl font-semibold mb-2">Course not found</h3>
-            <BackButton 
-              fallbackPath="/courses"
-              fallbackLabel="Back to Courses"
-              variant="outline"
-            />
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-orange-200 dark:border-orange-800">
+            <CardContent className="py-16 text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+              <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                <BookOpen className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Course not found</h3>
+              <p className="text-orange-700 dark:text-orange-300 font-medium mb-4">The course you're looking for doesn't exist or has been removed.</p>
+              <BackButton 
+                fallbackPath="/courses"
+                fallbackLabel="Back to Courses"
+                variant="outline"
+                className="bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border-orange-300 dark:border-orange-700"
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -538,37 +542,53 @@ export default function CourseDetail() {
       />
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-4 gap-8">
-          {/* Main Content Area */}
-          <div className="lg:col-span-3">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList 
-                className={`grid w-full ${isInstructor ? 'grid-cols-5' : 'grid-cols-4'} max-w-2xl`}
-              >
-                <TabsTrigger value="overview" className="flex items-center gap-2 text-xs sm:text-sm">
-                  <BarChart3 className="h-4 w-4 hidden sm:block" />
-                  Overview
-                </TabsTrigger>
-                <TabsTrigger value="curriculum" className="flex items-center gap-2 text-xs sm:text-sm">
-                  <BookOpen className="h-4 w-4 hidden sm:block" />
-                  Curriculum
-                </TabsTrigger>
-                <TabsTrigger value="resources" className="flex items-center gap-2 text-xs sm:text-sm">
-                  <Library className="h-4 w-4 hidden sm:block" />
-                  Resources
-                </TabsTrigger>
-                <TabsTrigger value="reviews" className="flex items-center gap-2 text-xs sm:text-sm">
-                  <MessageCircle className="h-4 w-4 hidden sm:block" />
-                  Reviews
-                </TabsTrigger>
-                {isInstructor && (
-                  <TabsTrigger value="students" className="flex items-center gap-2 text-xs sm:text-sm">
-                    <Users className="h-4 w-4 hidden sm:block" />
-                    Students
+      <div className="bg-background p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-4 gap-8">
+            {/* Main Content Area */}
+            <div className="lg:col-span-3">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <TabsList 
+                  className={`grid w-full ${isInstructor ? 'grid-cols-5' : 'grid-cols-4'} bg-orange-100 dark:bg-orange-900/30 p-1 rounded-lg border border-orange-200 dark:border-orange-800 max-w-2xl`}
+                >
+                  <TabsTrigger 
+                    value="overview" 
+                    className="flex items-center gap-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-600 dark:data-[state=active]:bg-orange-500 data-[state=active]:text-white font-semibold transition-all"
+                  >
+                    <BarChart3 className="h-4 w-4 hidden sm:block" />
+                    Overview
                   </TabsTrigger>
-                )}
-              </TabsList>
+                  <TabsTrigger 
+                    value="curriculum" 
+                    className="flex items-center gap-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-600 dark:data-[state=active]:bg-orange-500 data-[state=active]:text-white font-semibold transition-all"
+                  >
+                    <BookOpen className="h-4 w-4 hidden sm:block" />
+                    Curriculum
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="resources" 
+                    className="flex items-center gap-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-600 dark:data-[state=active]:bg-orange-500 data-[state=active]:text-white font-semibold transition-all"
+                  >
+                    <Library className="h-4 w-4 hidden sm:block" />
+                    Resources
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="reviews" 
+                    className="flex items-center gap-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-600 dark:data-[state=active]:bg-orange-500 data-[state=active]:text-white font-semibold transition-all"
+                  >
+                    <MessageCircle className="h-4 w-4 hidden sm:block" />
+                    Reviews
+                  </TabsTrigger>
+                  {isInstructor && (
+                    <TabsTrigger 
+                      value="students" 
+                      className="flex items-center gap-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-600 dark:data-[state=active]:bg-orange-500 data-[state=active]:text-white font-semibold transition-all"
+                    >
+                      <Users className="h-4 w-4 hidden sm:block" />
+                      Students
+                    </TabsTrigger>
+                  )}
+                </TabsList>
 
               <TabsContent value="overview">
                 <CourseOverview
@@ -640,6 +660,7 @@ export default function CourseDetail() {
               onJoinWaitlist={handleJoinWaitlist}
               onContinueLearning={() => setActiveTab('curriculum')}
             />
+            </div>
           </div>
         </div>
       </div>

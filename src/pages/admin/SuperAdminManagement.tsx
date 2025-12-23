@@ -1357,7 +1357,7 @@ export default function SuperAdminManagement() {
                       sticky: 'left',
                       minWidth: 300,
                       cell: (row) => (
-                        <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3">
                           {row.userItem.avatar_url ? (
                             <img 
                               src={row.userItem.avatar_url} 
@@ -1368,75 +1368,75 @@ export default function SuperAdminManagement() {
                             <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 ring-2 ring-border">
                               <span className="text-base font-semibold text-primary">
                                 {row.userItem.full_name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
+                                  </span>
+                                </div>
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="font-semibold text-sm truncate">{row.userItem.full_name}</p>
                             <p className="text-xs text-muted-foreground truncate">
                               {row.userItem.id.slice(0, 8)}...
-                            </p>
-                          </div>
-                        </div>
+                                  </p>
+                                </div>
+                              </div>
                       ),
                     },
                     {
                       id: 'currentRoles',
                       header: 'Current Roles',
                       cell: (row) => (
-                        <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-wrap gap-1.5">
                           {row.userItem.roles.length > 0 ? (
                             row.userItem.roles.map(r => (
-                              <Badge 
-                                key={r} 
-                                className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} font-medium`}
-                              >
-                                {r.replace('_', ' ')}
-                              </Badge>
-                            ))
-                          ) : (
-                            <Badge variant="outline" className="text-destructive border-destructive/30">
-                              No Role Assigned
-                            </Badge>
-                          )}
-                        </div>
+                                    <Badge 
+                                      key={r} 
+                                      className={`${ROLE_COLORS[r]?.bg} ${ROLE_COLORS[r]?.text} border ${ROLE_COLORS[r]?.border} font-medium`}
+                                    >
+                                      {r.replace('_', ' ')}
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <Badge variant="outline" className="text-destructive border-destructive/30">
+                                    No Role Assigned
+                                  </Badge>
+                                )}
+                              </div>
                       ),
                     },
                     {
                       id: 'assignRoles',
                       header: 'Assign Roles',
                       cell: (row) => {
-                        // Determine which roles to show based on current user's role
-                        let availableRoles: readonly string[];
-                        if (role === 'super_admin') {
-                          availableRoles = SUPER_ADMIN_ROLES;
-                        } else if (role === 'admin') {
-                          availableRoles = ADMIN_ROLES;
-                        } else {
-                          availableRoles = [];
-                        }
+                                  // Determine which roles to show based on current user's role
+                                  let availableRoles: readonly string[];
+                                  if (role === 'super_admin') {
+                                    availableRoles = SUPER_ADMIN_ROLES;
+                                  } else if (role === 'admin') {
+                                    availableRoles = ADMIN_ROLES;
+                                  } else {
+                                    availableRoles = [];
+                                  }
 
                         return (
                           <div className="flex flex-wrap gap-3">
                             {availableRoles.map(r => {
                               const hasThisRole = row.userItem.roles.includes(r);
-                              
-                              return (
-                                <label 
-                                  key={r} 
-                                  className="flex items-center gap-1.5 text-xs cursor-pointer select-none hover:bg-muted/50 px-2 py-1 rounded transition-colors"
-                                  title={hasThisRole ? `Remove ${r.replace('_', ' ')} role` : `Assign ${r.replace('_', ' ')} role`}
-                                >
-                                  <Checkbox
-                                    checked={hasThisRole}
+                                    
+                                    return (
+                                      <label 
+                                        key={r} 
+                                        className="flex items-center gap-1.5 text-xs cursor-pointer select-none hover:bg-muted/50 px-2 py-1 rounded transition-colors"
+                                        title={hasThisRole ? `Remove ${r.replace('_', ' ')} role` : `Assign ${r.replace('_', ' ')} role`}
+                                      >
+                                        <Checkbox
+                                          checked={hasThisRole}
                                     onCheckedChange={() => toggleRole(row.userItem.id, r as typeof ALL_ROLES[number], hasThisRole)}
-                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                  />
-                                  <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
-                                </label>
-                              );
+                                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                        />
+                                        <span className="capitalize whitespace-nowrap">{r.replace('_', ' ')}</span>
+                                      </label>
+                                    );
                             })}
-                          </div>
+                              </div>
                         );
                       },
                     },
@@ -1446,21 +1446,21 @@ export default function SuperAdminManagement() {
                       align: 'right',
                       width: 120,
                       cell: (row) => (
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            size="sm"
-                            variant="outline"
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                             onClick={() => openUserDetails(row.userItem)}
-                            title="View user details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
+                                  title="View user details"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                             onClick={() => openPermissionsDialog(row.userItem)}
                             title="View effective permissions (read-only)"
-                          >
+                                >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button
@@ -1470,17 +1470,17 @@ export default function SuperAdminManagement() {
                             title="Manage Role Permissions"
                           >
                             <Shield className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={true}
-                            className="opacity-30 cursor-not-allowed"
-                            title="Termination disabled (View Only Mode)"
-                          >
-                            <UserX className="h-4 w-4" />
-                          </Button>
-                        </div>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={true}
+                                  className="opacity-30 cursor-not-allowed"
+                                  title="Termination disabled (View Only Mode)"
+                                >
+                                  <UserX className="h-4 w-4" />
+                                </Button>
+                              </div>
                       ),
                     },
                   ]}
@@ -2322,11 +2322,11 @@ export default function SuperAdminManagement() {
                           </Button>
                         </div>
                       </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
             <div className="flex justify-between items-center pt-4 border-t mt-4">
               <p className="text-sm text-muted-foreground">
                 These permissions are inherited from the user's roles

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageCircle, Star, ThumbsUp, Filter } from 'lucide-react';
 import { StarRating, RatingBreakdown } from '@/components/StarRating';
+import { cn } from '@/lib/utils';
 
 interface Comment {
   id: string;
@@ -65,23 +66,23 @@ export function CourseReviews({
     <div className="grid lg:grid-cols-3 gap-6">
       {/* Rating Summary */}
       <div className="space-y-6">
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-chart-2" />
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+              <Star className="h-5 w-5 text-orange-600 dark:text-orange-400 fill-orange-500" />
               Course Rating
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-center">
-              <p className="text-5xl font-bold text-foreground">{averageRating.toFixed(1)}</p>
+              <p className="text-5xl font-bold text-orange-700 dark:text-orange-300">{averageRating.toFixed(1)}</p>
               <div className="flex justify-center mt-2">
                 <StarRating rating={averageRating} size="lg" />
               </div>
-              <p className="text-sm text-muted-foreground mt-2">{totalRatings} ratings</p>
+              <p className="text-sm text-orange-600 dark:text-orange-400 font-medium mt-2">{totalRatings} ratings</p>
             </div>
             
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t border-orange-200 dark:border-orange-800">
               <RatingBreakdown ratings={ratingBreakdown} totalRatings={totalRatings} />
             </div>
           </CardContent>
@@ -89,10 +90,10 @@ export function CourseReviews({
 
         {/* Rate This Course */}
         {isLoggedIn && (
-          <Card>
+          <Card className="border-orange-200 dark:border-orange-800">
             <CardHeader>
-              <CardTitle className="text-base">Rate this Course</CardTitle>
-              <CardDescription>Share your experience</CardDescription>
+              <CardTitle className="text-base text-orange-700 dark:text-orange-300">Rate this Course</CardTitle>
+              <CardDescription className="text-orange-600 dark:text-orange-400">Share your experience</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-center">
@@ -104,7 +105,7 @@ export function CourseReviews({
                 />
               </div>
               {userRating > 0 && (
-                <p className="text-center text-sm text-muted-foreground">
+                <p className="text-center text-sm text-orange-600 dark:text-orange-400 font-medium">
                   Your rating: {userRating}/5
                 </p>
               )}
@@ -115,16 +116,16 @@ export function CourseReviews({
 
       {/* Reviews List */}
       <div className="lg:col-span-2">
-        <Card>
+        <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                <MessageCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 Reviews ({comments.length})
               </CardTitle>
               <div className="flex gap-2">
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[140px] border-orange-200 dark:border-orange-800">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -138,16 +139,20 @@ export function CourseReviews({
           <CardContent className="space-y-6">
             {/* Write a Review */}
             {isLoggedIn && (
-              <div className="space-y-3 p-4 bg-course-detail/50 rounded-lg">
+              <div className="space-y-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                 <Textarea
                   placeholder="Write your review..."
                   value={newComment}
                   onChange={(e) => onCommentChange(e.target.value)}
                   rows={3}
-                  className="resize-none"
+                  className="resize-none border-orange-200 dark:border-orange-800 focus:border-orange-500 dark:focus:border-orange-500"
                 />
                 <div className="flex justify-end">
-                  <Button onClick={onSubmitComment} disabled={!newComment.trim()}>
+                  <Button 
+                    onClick={onSubmitComment} 
+                    disabled={!newComment.trim()}
+                    className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                  >
                     Post Review
                   </Button>
                 </div>
@@ -158,25 +163,33 @@ export function CourseReviews({
             <ScrollArea className="h-[500px] pr-4">
               {sortedComments.length === 0 ? (
                 <div className="text-center py-12">
-                  <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No reviews yet. Be the first to share your experience!</p>
+                  <div className="h-12 w-12 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                    <MessageCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <p className="text-orange-700 dark:text-orange-300 font-medium">No reviews yet. Be the first to share your experience!</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {sortedComments.map((comment) => (
-                    <div key={comment.id} className="p-4 rounded-lg border bg-card">
+                    <div 
+                      key={comment.id} 
+                      className={cn(
+                        "p-4 rounded-lg border bg-card border-orange-200 dark:border-orange-800",
+                        "hover:shadow-md transition-all duration-200"
+                      )}
+                    >
                       <div className="flex items-start gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                          <AvatarFallback className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-sm font-semibold">
                             {getInitials(comment.profiles?.full_name || 'User')}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-sm">
+                            <p className="font-semibold text-sm text-foreground">
                               {comment.profiles?.full_name || 'Anonymous'}
                             </p>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
                               {new Date(comment.created_at).toLocaleDateString('en-US', {
                                 year: 'numeric',
                                 month: 'short',
@@ -184,7 +197,7 @@ export function CourseReviews({
                               })}
                             </span>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-2">{comment.comment_text}</p>
+                          <p className="text-sm text-foreground/80 mt-2 leading-relaxed">{comment.comment_text}</p>
                         </div>
                       </div>
                     </div>

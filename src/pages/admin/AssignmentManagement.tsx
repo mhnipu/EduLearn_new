@@ -5,6 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { GradeInput } from '@/components/ui/grade-input';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -93,9 +95,8 @@ export default function AssignmentManagement() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [guidelines, setGuidelines] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [dueTime, setDueTime] = useState('');
-  const [maxScore, setMaxScore] = useState<string>('100');
+  const [dueDateTime, setDueDateTime] = useState<Date | undefined>(undefined);
+  const [maxScore, setMaxScore] = useState<number>(100);
   const [categoryId, setCategoryId] = useState<string>('');
   const [courseId, setCourseId] = useState<string>('');
   const [assessmentType, setAssessmentType] = useState<string>('assignment');
@@ -280,9 +281,8 @@ export default function AssignmentManagement() {
     setTitle('');
     setDescription('');
     setGuidelines('');
-    setDueDate('');
-    setDueTime('');
-    setMaxScore('100');
+    setDueDateTime(undefined);
+    setMaxScore(100);
     setCategoryId('');
     setCourseId('');
     setAssessmentType('assignment');
@@ -309,23 +309,14 @@ export default function AssignmentManagement() {
     setAttachmentUrl(assignment.attachment_url || null);
     setAttachmentFile(null);
     
-    // Format date and time separately
+    // Set date-time object
     if (assignment.due_date) {
-      const date = new Date(assignment.due_date);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      setDueDate(`${year}-${month}-${day}`);
-      
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      setDueTime(`${hours}:${minutes}`);
+      setDueDateTime(new Date(assignment.due_date));
     } else {
-      setDueDate('');
-      setDueTime('');
+      setDueDateTime(undefined);
     }
     
-    setMaxScore(assignment.max_score?.toString() || '100');
+    setMaxScore(assignment.max_score || 100);
     setCategoryId(assignment.category_id || '');
     setIsActive(assignment.is_active ?? true);
     setLateSubmissionAllowed(assignment.late_submission_allowed ?? true);
@@ -342,23 +333,14 @@ export default function AssignmentManagement() {
 
     setSaving(true);
     try {
-      // Combine date and time for due_date
+      // Convert date-time to ISO string
       let dueDateISO: string | null = null;
-      if (dueDate) {
-        if (dueTime) {
-          // Combine date and time
-          const dateTimeString = `${dueDate}T${dueTime}:00`;
-          dueDateISO = new Date(dateTimeString).toISOString();
-        } else {
-          // Only date, set to end of day
-          const dateTimeString = `${dueDate}T23:59:59`;
-          dueDateISO = new Date(dateTimeString).toISOString();
-        }
+      if (dueDateTime) {
+        dueDateISO = dueDateTime.toISOString();
       }
 
-      // Parse max_score safely
-      const maxScoreNum = maxScore ? parseInt(maxScore, 10) : 100;
-      if (isNaN(maxScoreNum) || maxScoreNum < 1) {
+      // Validate max_score
+      if (!maxScore || maxScore < 1) {
         toast({ title: 'Max Score must be a valid number greater than 0', variant: 'destructive' });
         setSaving(false);
         return;
@@ -405,7 +387,7 @@ export default function AssignmentManagement() {
         description: description.trim() || null,
         guidelines: guidelines.trim() || null,
         due_date: dueDateISO,
-        max_score: maxScoreNum,
+        max_score: maxScore,
         category_id: categoryId || null,
         course_id: courseId || null,
         assessment_type: assessmentType,
@@ -640,26 +622,14 @@ export default function AssignmentManagement() {
                         Clear instructions help students understand what is expected and how to participate
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="dueDate">Due Date</Label>
-                        <Input
-                          id="dueDate"
-                          type="date"
-                          value={dueDate}
-                          onChange={(e) => setDueDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="dueTime">Due Time (Optional)</Label>
-                        <Input
-                          id="dueTime"
-                          type="time"
-                          value={dueTime}
-                          onChange={(e) => setDueTime(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                    <DateTimePicker
+                      id="dueDateTime"
+                      label="Deadline Date & Time"
+                      date={dueDateTime}
+                      onDateChange={setDueDateTime}
+                      placeholder="Select deadline date and time"
+                      helperText="Set when students must submit this assignment. Leave empty for no deadline."
+                    />
                     <div className="space-y-2">
                       <Label>Attachment (Optional)</Label>
                       <p className="text-xs text-muted-foreground mb-2">
@@ -778,26 +748,23 @@ export default function AssignmentManagement() {
                   </TabsContent>
 
                   <TabsContent value="grading" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="maxScore">Max Score</Label>
-                      <Input
-                        id="maxScore"
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={maxScore}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '' || (!isNaN(Number(val)) && Number(val) >= 0)) {
-                            setMaxScore(val);
-                          }
-                        }}
-                        placeholder="100"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Maximum points students can earn for this assessment
-                      </p>
-                    </div>
+                    <GradeInput
+                      id="maxScore"
+                      label="Maximum Score"
+                      value={maxScore}
+                      onChange={setMaxScore}
+                      maxScore={10000}
+                      showPercentage={false}
+                      showSuccessIcon={false}
+                      helperText="Maximum points students can earn for this assessment"
+                      error={
+                        maxScore < 1
+                          ? "Max score must be at least 1"
+                          : maxScore > 10000
+                          ? "Max score cannot exceed 10,000"
+                          : undefined
+                      }
+                    />
 
                     <Separator />
 

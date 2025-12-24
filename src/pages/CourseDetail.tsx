@@ -549,7 +549,7 @@ export default function CourseDetail() {
             <div className="lg:col-span-3">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <TabsList 
-                  className={`grid w-full ${isInstructor ? 'grid-cols-5' : 'grid-cols-4'} bg-orange-100 dark:bg-orange-900/30 p-1 rounded-lg border border-orange-200 dark:border-orange-800 max-w-2xl`}
+                  className={`grid w-full ${isInstructor ? 'grid-cols-5' : 'grid-cols-4'} bg-orange-100 dark:bg-orange-900/30 p-1 rounded-lg shadow-sm max-w-2xl`}
                 >
                   <TabsTrigger 
                     value="overview" 

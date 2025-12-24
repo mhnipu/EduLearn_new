@@ -68,6 +68,7 @@ export default function Library() {
   const [isEditVideoOpen, setIsEditVideoOpen] = useState(false);
   const [playingVideo, setPlayingVideo] = useState<VideoItem | null>(null);
   const [isVideoPlayerOpen, setIsVideoPlayerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('books');
 
   useEffect(() => {
     fetchCategories();
@@ -226,8 +227,8 @@ export default function Library() {
             />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full md:w-[200px] border-orange-200 dark:border-orange-800">
-              <SelectValue placeholder="Select category" />
+            <SelectTrigger className="w-full md:w-[200px] border-0 bg-orange-50 dark:bg-orange-900/20 text-foreground hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
+              <SelectValue placeholder="Select category" className="text-foreground" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
@@ -241,8 +242,8 @@ export default function Library() {
         </div>
 
         {/* Tabs for Books and Videos */}
-        <Tabs defaultValue="books" className="w-full">
-          <TabsList className="grid w-full md:w-[400px] grid-cols-2 bg-orange-100 dark:bg-orange-900/30 p-1 rounded-lg border border-orange-200 dark:border-orange-800">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full md:w-[400px] grid-cols-2 bg-orange-100 dark:bg-orange-900/30 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="books"
               className="text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-600 dark:data-[state=active]:bg-orange-500 data-[state=active]:text-white font-semibold transition-all"
@@ -260,12 +261,19 @@ export default function Library() {
           </TabsList>
 
           <TabsContent value="books" className="space-y-4 mt-6">
+            {!loading && books.length > 0 && (
+              <p className="text-sm text-orange-600 dark:text-orange-400 font-medium mb-2">
+                Showing {books.length} {books.length === 1 ? 'book' : 'books'}
+                {searchQuery && ` for "${searchQuery}"`}
+                {selectedCategory !== 'all' && ` in ${categories.find(c => c.id === selectedCategory)?.name || 'category'}`}
+              </p>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-orange-600 dark:text-orange-400" />
               </div>
             ) : books.length === 0 ? (
-              <Card className="border-orange-200 dark:border-orange-800">
+              <Card className="shadow-lg bg-card hover:shadow-xl transition-all duration-300">
                 <CardContent className="py-16 text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
                     <BookOpen className="h-8 w-8 text-orange-600 dark:text-orange-400" />
@@ -335,7 +343,7 @@ export default function Library() {
                   <CardFooter className="flex gap-2 pt-0">
                     <Button 
                       onClick={() => navigate(`/library/book/${book.id}`)}
-                      className="flex-1"
+                      className="flex-1 border-0 hover:scale-105 hover:shadow-lg transition-all duration-200"
                       size="sm"
                     >
                       View
@@ -344,7 +352,7 @@ export default function Library() {
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 border-0 hover:scale-105 hover:shadow-lg transition-all duration-200"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedBook(book);
@@ -358,7 +366,7 @@ export default function Library() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 border-0 hover:scale-105 hover:shadow-lg transition-all duration-200"
                       onClick={() => handleBookmark('book', book.id)}
                     >
                       <Bookmark className="h-4 w-4" />
@@ -371,12 +379,19 @@ export default function Library() {
           </TabsContent>
 
           <TabsContent value="videos" className="space-y-4 mt-6">
+            {!loading && videos.length > 0 && (
+              <p className="text-sm text-orange-600 dark:text-orange-400 font-medium mb-2">
+                Showing {videos.length} {videos.length === 1 ? 'video' : 'videos'}
+                {searchQuery && ` for "${searchQuery}"`}
+                {selectedCategory !== 'all' && ` in ${categories.find(c => c.id === selectedCategory)?.name || 'category'}`}
+              </p>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-orange-600 dark:text-orange-400" />
               </div>
             ) : videos.length === 0 ? (
-              <Card className="border-orange-200 dark:border-orange-800">
+              <Card className="shadow-lg bg-card hover:shadow-xl transition-all duration-300">
                 <CardContent className="py-16 text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
                     <Video className="h-8 w-8 text-orange-600 dark:text-orange-400" />
@@ -399,13 +414,13 @@ export default function Library() {
                   <Card 
                     key={video.id} 
                     className={cn(
-                      "border-orange-200 dark:border-orange-800 hover:border-orange-500 dark:hover:border-orange-500",
-                      "hover:shadow-xl transition-all duration-300 group"
+                      "shadow-md bg-card",
+                      "hover:shadow-2xl hover:scale-105 transition-all duration-300 group"
                     )}
                   >
                     <CardHeader className="pb-3">
                       <div 
-                        className="aspect-video mb-4 rounded-md overflow-hidden bg-orange-100 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 relative cursor-pointer"
+                        className="aspect-video mb-4 rounded-md overflow-hidden bg-orange-100 dark:bg-orange-900/30 relative cursor-pointer"
                         onClick={() => {
                           setPlayingVideo(video);
                           setIsVideoPlayerOpen(true);
@@ -449,7 +464,7 @@ export default function Library() {
                           <Badge 
                             key={tag} 
                             variant="secondary" 
-                            className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700"
+                            className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-0"
                           >
                             {tag}
                           </Badge>
@@ -474,7 +489,7 @@ export default function Library() {
                           setPlayingVideo(video);
                           setIsVideoPlayerOpen(true);
                         }}
-                        className="flex-1 bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                        className="flex-1 bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600 border-0 hover:scale-105 hover:shadow-lg transition-all duration-200"
                         size="sm"
                       >
                         Watch
@@ -483,7 +498,7 @@ export default function Library() {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-8 w-8 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300"
+                          className="h-8 w-8 border-0 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedVideo(video);
@@ -497,7 +512,7 @@ export default function Library() {
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-8 w-8 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300"
+                        className="h-8 w-8 border-0 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
                         onClick={() => handleBookmark('video', video.id)}
                       >
                         <Bookmark className="h-4 w-4" />

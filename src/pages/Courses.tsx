@@ -269,20 +269,20 @@ export default function Courses() {
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-600 dark:text-orange-400 h-5 w-5" />
           <Input
             type="text"
             placeholder="Search courses..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 border-0 bg-orange-50 dark:bg-orange-900/20 text-foreground placeholder:text-orange-600/60 dark:placeholder:text-orange-400/60 focus:ring-2 focus:ring-orange-500/50 focus:ring-offset-2 focus:bg-orange-100 dark:focus:bg-orange-900/30 transition-all"
           />
         </div>
         
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Category" />
+          <SelectTrigger className="w-full md:w-[180px] border-0 bg-orange-50 dark:bg-orange-900/20 text-foreground hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
+            <Filter className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <SelectValue placeholder="Category" className="text-foreground" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
@@ -295,8 +295,8 @@ export default function Courses() {
         </Select>
 
         <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-          <SelectTrigger className="w-full md:w-[160px]">
-            <SelectValue placeholder="Difficulty" />
+          <SelectTrigger className="w-full md:w-[160px] border-0 bg-orange-50 dark:bg-orange-900/20 text-foreground hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
+            <SelectValue placeholder="Difficulty" className="text-foreground" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Levels</SelectItem>
@@ -309,8 +309,8 @@ export default function Courses() {
         </Select>
 
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Sort by" />
+          <SelectTrigger className="w-full md:w-[180px] border-0 bg-orange-50 dark:bg-orange-900/20 text-foreground hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
+            <SelectValue placeholder="Sort by" className="text-foreground" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="newest">Newest First</SelectItem>
@@ -322,13 +322,27 @@ export default function Courses() {
       </div>
 
       {/* Results count */}
-      <p className="text-sm text-muted-foreground mb-4">
-        Showing {filteredCourses.length} of {courses.length} courses
-      </p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+          Showing <span className="font-semibold text-orange-700 dark:text-orange-300">{filteredCourses.length}</span> of <span className="font-semibold text-orange-700 dark:text-orange-300">{courses.length}</span> courses
+          {searchQuery && (
+            <span className="ml-2">for "<span className="font-semibold">{searchQuery}</span>"</span>
+          )}
+        </p>
+        {(selectedCategory !== 'all' || selectedDifficulty !== 'all') && (
+          <div className="flex items-center gap-2">
+            {(selectedCategory !== 'all' || selectedDifficulty !== 'all') && (
+              <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-0">
+                Filters active
+              </Badge>
+            )}
+          </div>
+        )}
+      </div>
 
         {/* Courses Grid */}
         {filteredCourses.length === 0 ? (
-          <Card className="border-orange-200 dark:border-orange-800">
+          <Card className="shadow-lg bg-card hover:shadow-xl transition-all duration-300">
             <CardContent className="py-16 text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg">
               <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
                 <BookOpen className="h-8 w-8 text-orange-600 dark:text-orange-400" />
@@ -346,11 +360,11 @@ export default function Courses() {
           {filteredCourses.map((course) => (
             <Card
               key={course.id}
-              className="border hover:border-primary transition-all cursor-pointer group overflow-hidden"
+              className="shadow-md bg-card hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group overflow-hidden"
               onClick={() => navigate(`/courses/${course.id}`)}
             >
               {/* Thumbnail */}
-              <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 relative overflow-hidden">
+              <div className="aspect-video bg-gradient-to-br from-orange-500/20 to-orange-600/10 relative overflow-hidden">
                 {course.thumbnail_url ? (
                   <img
                     src={course.thumbnail_url}
@@ -361,8 +375,8 @@ export default function Courses() {
                     }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-colors">
-                    <BookOpen className="h-12 w-12 text-primary" />
+                  <div className="w-full h-full flex items-center justify-center group-hover:from-orange-500/30 group-hover:to-orange-600/20 transition-colors">
+                    <BookOpen className="h-12 w-12 text-orange-600 dark:text-orange-400" />
                   </div>
                 )}
                 
@@ -373,13 +387,13 @@ export default function Courses() {
                       <Badge
                         key={cat.id}
                         variant="secondary"
-                        className="bg-background/90 backdrop-blur-sm text-xs"
+                        className="bg-background/90 backdrop-blur-sm text-xs border-0"
                       >
                         {cat.icon} {cat.name}
                       </Badge>
                     ))}
                     {course.categories.length > 2 && (
-                      <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm text-xs">
+                      <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm text-xs border-0">
                         +{course.categories.length - 2}
                       </Badge>
                     )}
@@ -388,7 +402,7 @@ export default function Courses() {
                 
                 {/* Difficulty badge */}
                 {course.difficulty && (
-                  <Badge className={`absolute top-2 right-2 ${getDifficultyColor(course.difficulty)} text-xs capitalize`}>
+                  <Badge className={`absolute top-2 right-2 ${getDifficultyColor(course.difficulty)} text-xs capitalize border-0`}>
                     {course.difficulty}
                   </Badge>
                 )}
@@ -444,7 +458,7 @@ export default function Courses() {
               <CardFooter className="pt-2">
                 <Button 
                   variant="outline" 
-                  className="w-full bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 font-semibold transition-all group-hover:shadow-md"
+                  className="w-full bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border-0 text-orange-700 dark:text-orange-300 font-semibold hover:scale-105 hover:shadow-lg transition-all duration-200"
                 >
                   View Course
                   <BookOpen className="ml-2 h-4 w-4" />

@@ -127,10 +127,10 @@ export function CourseCurriculum({
       <div className="lg:col-span-2 space-y-4">
         {selectedItem ? (
           <Card className={cn(
-            "shadow-xl border-orange-200 dark:border-orange-800",
-            "hover:shadow-2xl transition-all duration-300"
+            "shadow-lg bg-card",
+            "hover:shadow-2xl hover:scale-[1.01] transition-all duration-300"
           )}>
-            <CardHeader className="pb-3 border-b border-orange-200 dark:border-orange-800">
+            <CardHeader className="pb-3 border-b border-border/50">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   {hasVideo(selectedItem) ? (
@@ -203,7 +203,7 @@ export function CourseCurriculum({
                 if (pdfUrl) {
                   return (
                     <div className="space-y-4">
-                      <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 rounded-lg overflow-hidden shadow-lg border border-orange-200 dark:border-orange-800">
+                      <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 rounded-lg overflow-hidden shadow-lg">
                         <iframe
                           src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
                           className="w-full h-full"
@@ -213,7 +213,7 @@ export function CourseCurriculum({
                       <Button 
                         asChild 
                         variant="outline" 
-                        className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30" 
+                        className="w-full border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200" 
                         size="lg"
                       >
                         <a href={pdfUrl} target="_blank" rel="noopener noreferrer" download>
@@ -225,7 +225,7 @@ export function CourseCurriculum({
                   );
                 }
                 return (
-                  <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 rounded-lg flex items-center justify-center border-2 border-dashed border-orange-300 dark:border-orange-700">
+                  <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 rounded-lg flex items-center justify-center border-2 border-dashed border-orange-300/50 dark:border-orange-700/50">
                     <div className="text-center">
                       <FileText className="h-12 w-12 text-orange-600 dark:text-orange-400 mx-auto mb-2" />
                       <p className="text-orange-700 dark:text-orange-300 font-medium">No content available</p>
@@ -237,8 +237,8 @@ export function CourseCurriculum({
           </Card>
         ) : (
           <Card className={cn(
-            "shadow-xl border-orange-200 dark:border-orange-800",
-            "hover:shadow-2xl transition-all duration-300"
+            "shadow-lg bg-card",
+            "hover:shadow-2xl hover:scale-[1.01] transition-all duration-300"
           )}>
             <CardContent className="flex flex-col items-center justify-center py-20 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
               {!isEnrolled ? (
@@ -270,8 +270,8 @@ export function CourseCurriculum({
       {/* Course Content Sidebar */}
       <div className="lg:col-span-1">
         <Card className={cn(
-          "sticky top-4 shadow-xl border-2 border-orange-200 dark:border-orange-800",
-          "hover:shadow-2xl transition-all duration-300"
+          "sticky top-4 shadow-lg bg-card",
+          "hover:shadow-2xl hover:scale-[1.01] transition-all duration-300"
         )}>
           <CardHeader className="pb-3 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
             <div className="flex items-center gap-2 mb-2">
@@ -308,7 +308,7 @@ export function CourseCurriculum({
                   return (
                     <Accordion key={module.id} type="single" collapsible className="w-full">
                       <AccordionItem value={module.id} className="border-0">
-                        <AccordionTrigger className="px-3 py-2.5 hover:no-underline bg-orange-50 dark:bg-orange-900/20 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border border-orange-200 dark:border-orange-800">
+                        <AccordionTrigger className="px-3 py-2.5 hover:no-underline bg-orange-50 dark:bg-orange-900/20 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-[1.02] hover:shadow-md transition-all duration-200">
                           <div className="flex items-center justify-between w-full pr-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <Layers className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
@@ -335,7 +335,7 @@ export function CourseCurriculum({
                                   "w-full p-3 text-left transition-all rounded-md flex items-center gap-3",
                                   selectedItem?.id === lesson.id 
                                     ? 'bg-orange-100 dark:bg-orange-900/30 border-l-2 border-l-orange-600 dark:border-l-orange-500 shadow-sm' 
-                                    : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer' : 'cursor-not-allowed opacity-60'
+                                    : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:scale-[1.02] hover:shadow-md cursor-pointer' : 'cursor-not-allowed opacity-60'
                                 )}
                                 title={!isEnrolled ? 'Please enroll to access this lesson' : lesson.title}
                               >
@@ -345,7 +345,7 @@ export function CourseCurriculum({
                                     ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-400' 
                                     : selectedItem?.id === lesson.id
                                     ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-600 dark:border-orange-500 text-orange-700 dark:text-orange-300'
-                                    : 'bg-background border-orange-200 dark:border-orange-800'
+                                    : 'bg-background border-orange-200/50 dark:border-orange-800/50'
                                 )}>
                                   {completedLessons.has(lesson.id) ? (
                                     <CheckCircle className="h-4 w-4" />
@@ -399,7 +399,7 @@ export function CourseCurriculum({
                             "w-full p-3 text-left transition-all rounded-md flex items-center gap-3",
                             selectedItem?.id === lesson.id 
                               ? 'bg-orange-100 dark:bg-orange-900/30 border-l-2 border-l-orange-600 dark:border-l-orange-500 shadow-sm' 
-                              : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer' : 'cursor-not-allowed opacity-60'
+                              : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:scale-[1.02] hover:shadow-md cursor-pointer' : 'cursor-not-allowed opacity-60'
                           )}
                           title={!isEnrolled ? 'Please enroll to access this lesson' : lesson.title}
                         >
@@ -409,7 +409,7 @@ export function CourseCurriculum({
                               ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-400' 
                               : selectedItem?.id === lesson.id
                               ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-600 dark:border-orange-500 text-orange-700 dark:text-orange-300'
-                              : 'bg-background border-orange-200 dark:border-orange-800'
+                              : 'bg-background border-orange-200/50 dark:border-orange-800/50'
                           )}>
                             {completedLessons.has(lesson.id) ? (
                               <CheckCircle className="h-4 w-4" />
@@ -443,7 +443,7 @@ export function CourseCurriculum({
                 {/* Materials Section */}
                 {materials.length > 0 && (
                   <>
-                    <Separator className="my-4 bg-orange-200 dark:bg-orange-800" />
+                    <Separator className="my-4 bg-orange-200/50 dark:bg-orange-800/50" />
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 px-3 py-2">
                         <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
@@ -462,17 +462,18 @@ export function CourseCurriculum({
                               "w-full p-3 text-left transition-all rounded-md flex items-center gap-3",
                               selectedItem?.id === material.id 
                                 ? 'bg-orange-100 dark:bg-orange-900/30 border-l-2 border-l-orange-600 dark:border-l-orange-500 shadow-sm' 
-                                : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer' : 'cursor-not-allowed opacity-60'
+                                : isEnrolled ? 'hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:scale-[1.02] hover:shadow-md cursor-pointer' : 'cursor-not-allowed opacity-60'
                             )}
                             title={!isEnrolled ? 'Please enroll to access this material' : material.title}
                           >
-                            <div className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
+                            <div className={cn(
+                              "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium transition-all",
                               completedLessons.has(material.id) 
                                 ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-400' 
                                 : selectedItem?.id === material.id
-                                ? 'bg-primary/20 border-primary text-primary'
-                                : 'bg-background border-muted-foreground/30'
-                            }`}>
+                                ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-600 dark:border-orange-500 text-orange-700 dark:text-orange-300'
+                                : 'bg-background border-orange-200/50 dark:border-orange-800/50'
+                            )}>
                               {completedLessons.has(material.id) ? (
                                 <CheckCircle className="h-4 w-4" />
                               ) : !isEnrolled ? (

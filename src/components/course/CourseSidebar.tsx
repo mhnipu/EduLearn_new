@@ -79,7 +79,7 @@ export function CourseSidebar({
           <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
         </div>
       ) : (
-        <div className="w-full aspect-video bg-gradient-to-br from-orange-500/20 to-orange-600/10 flex items-center justify-center border-b border-orange-200 dark:border-orange-800">
+        <div className="w-full aspect-video bg-gradient-to-br from-orange-500/20 to-orange-600/10 flex items-center justify-center">
           <GraduationCap className="h-16 w-16 text-orange-600/50 dark:text-orange-400/50" />
         </div>
       )}
@@ -89,7 +89,7 @@ export function CourseSidebar({
         {role === 'student' && !isEnrolled && !waitlistInfo.isOnWaitlist ? (
           isCourseFull ? (
             <div className="space-y-3">
-              <div className="text-center p-3 bg-chart-1/10 rounded-lg border border-chart-1/30">
+              <div className="text-center p-3 bg-chart-1/10 rounded-lg shadow-sm">
                 <p className="text-chart-1 font-medium text-sm">Course is at full capacity</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {course.max_capacity} / {course.max_capacity} seats taken
@@ -118,7 +118,7 @@ export function CourseSidebar({
           </div>
         ) : isEnrolled ? (
           <div className="space-y-3">
-            <Badge className="w-full justify-center py-2 bg-chart-1/10 text-chart-1 border-chart-1/30">
+            <Badge className="w-full justify-center py-2 bg-chart-1/10 text-chart-1 border-0">
               <CheckCircle className="mr-2 h-4 w-4" />
               Enrolled
             </Badge>
@@ -135,7 +135,7 @@ export function CourseSidebar({
             <Button 
               onClick={() => navigate(`/admin/courses/${course.id}/edit`)} 
               variant="outline" 
-              className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+              className="w-full border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
             >
               <Edit className="mr-2 h-4 w-4" />
               Edit Course
@@ -143,7 +143,7 @@ export function CourseSidebar({
             <Button 
               onClick={() => navigate(`/admin/courses/${course.id}/modules`)} 
               variant="outline" 
-              className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+              className="w-full border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
             >
               <Settings className="mr-2 h-4 w-4" />
               Manage Structure
@@ -151,7 +151,7 @@ export function CourseSidebar({
             <Button 
               onClick={() => navigate(`/admin/courses/${course.id}/materials`)} 
               variant="outline" 
-              className="w-full border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+              className="w-full border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
             >
               <BookOpen className="mr-2 h-4 w-4" />
               Manage Materials
@@ -198,7 +198,7 @@ export function CourseSidebar({
         <div className="flex gap-2">
           <Button 
             variant="outline" 
-            className="flex-1 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30" 
+            className="flex-1 border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200" 
             size="sm" 
             onClick={handleShare}
           >
@@ -208,7 +208,7 @@ export function CourseSidebar({
           <Button 
             variant="outline" 
             size="sm"
-            className="border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+            className="border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
               toast({ title: 'Link copied!' });

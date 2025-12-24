@@ -141,7 +141,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
   // Show resources even if not enrolled (but with message)
   if (!hasResources) {
     return (
-      <Card className="border-orange-200 dark:border-orange-800">
+      <Card className="shadow-lg bg-card hover:shadow-xl transition-all duration-300">
         <CardContent className="flex flex-col items-center justify-center py-16 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
           <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
             <Library className="h-8 w-8 text-orange-600 dark:text-orange-400" />
@@ -160,7 +160,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
   return (
     <div className="space-y-6">
       {!isEnrolled && (
-        <Card className="bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700">
+        <Card className="bg-orange-50 dark:bg-orange-900/20 shadow-md hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300 font-medium">
               <Lock className="h-4 w-4" />
@@ -172,7 +172,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
       
       {/* Books */}
       {books.length > 0 && (
-        <Card className="border-orange-200 dark:border-orange-800">
+        <Card className="shadow-lg bg-card hover:shadow-xl transition-all duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
               <BookOpen className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -186,8 +186,8 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                 <Card 
                   key={book.id} 
                   className={cn(
-                    "overflow-hidden border-orange-200 dark:border-orange-800",
-                    "hover:shadow-xl transition-all duration-300"
+                    "overflow-hidden shadow-md bg-card",
+                    "hover:shadow-2xl hover:scale-105 transition-all duration-300"
                   )}
                 >
                   <div className="aspect-[3/4] bg-orange-50 dark:bg-orange-900/20 relative">
@@ -210,7 +210,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                     )}
                     <div className="flex items-center gap-2 mt-3">
                       {book.page_count && (
-                        <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                        <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-0">
                           {book.page_count} pages
                         </Badge>
                       )}
@@ -220,7 +220,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                         asChild 
                         variant="outline" 
                         size="sm" 
-                        className="w-full mt-3 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                        className="w-full mt-3 border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
                       >
                         <a href={book.pdf_url} target="_blank" rel="noopener noreferrer">
                           <Download className="mr-2 h-3 w-3" />
@@ -243,7 +243,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
 
       {/* Videos */}
       {videos.length > 0 && (
-        <Card className="border-orange-200 dark:border-orange-800">
+        <Card className="shadow-lg bg-card hover:shadow-xl transition-all duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
               <Video className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -257,8 +257,8 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                 <Card 
                   key={video.id} 
                   className={cn(
-                    "overflow-hidden border-orange-200 dark:border-orange-800",
-                    "hover:shadow-xl transition-all duration-300"
+                    "overflow-hidden shadow-md bg-card",
+                    "hover:shadow-2xl hover:scale-105 transition-all duration-300"
                   )}
                 >
                   <div className="aspect-video bg-orange-50 dark:bg-orange-900/20 relative">
@@ -278,7 +278,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                     <h4 className="font-medium text-sm line-clamp-2 text-foreground">{video.title}</h4>
                     <div className="flex items-center gap-2 mt-3">
                       {video.duration_minutes && (
-                        <Badge variant="secondary" className="text-xs flex items-center gap-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                        <Badge variant="secondary" className="text-xs flex items-center gap-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-0">
                           <Clock className="h-3 w-3" />
                           {video.duration_minutes} min
                         </Badge>
@@ -289,7 +289,7 @@ export function CourseResources({ courseId, isEnrolled }: CourseResourcesProps) 
                         asChild 
                         variant="outline" 
                         size="sm" 
-                        className="w-full mt-3 border-orange-300 dark:border-orange-700 hover:border-orange-500 dark:hover:border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30"
+                        className="w-full mt-3 border-0 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:scale-105 hover:shadow-lg transition-all duration-200"
                       >
                         <a href={video.youtube_url} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="mr-2 h-3 w-3" />

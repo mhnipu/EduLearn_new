@@ -66,7 +66,7 @@ export function CourseReviews({
     <div className="grid lg:grid-cols-3 gap-6">
       {/* Rating Summary */}
       <div className="space-y-6">
-        <Card className="border-orange-200 dark:border-orange-800">
+        <Card className="shadow-lg bg-card hover:shadow-xl hover:scale-[1.01] transition-all duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
               <Star className="h-5 w-5 text-orange-600 dark:text-orange-400 fill-orange-500" />
@@ -82,7 +82,7 @@ export function CourseReviews({
               <p className="text-sm text-orange-600 dark:text-orange-400 font-medium mt-2">{totalRatings} ratings</p>
             </div>
             
-            <div className="pt-4 border-t border-orange-200 dark:border-orange-800">
+            <div className="pt-4 border-t border-border/50">
               <RatingBreakdown ratings={ratingBreakdown} totalRatings={totalRatings} />
             </div>
           </CardContent>
@@ -90,7 +90,7 @@ export function CourseReviews({
 
         {/* Rate This Course */}
         {isLoggedIn && (
-          <Card className="border-orange-200 dark:border-orange-800">
+          <Card className="shadow-lg bg-card hover:shadow-xl hover:scale-[1.01] transition-all duration-300">
             <CardHeader>
               <CardTitle className="text-base text-orange-700 dark:text-orange-300">Rate this Course</CardTitle>
               <CardDescription className="text-orange-600 dark:text-orange-400">Share your experience</CardDescription>
@@ -116,7 +116,7 @@ export function CourseReviews({
 
       {/* Reviews List */}
       <div className="lg:col-span-2">
-        <Card className="border-orange-200 dark:border-orange-800">
+        <Card className="shadow-lg bg-card hover:shadow-xl hover:scale-[1.01] transition-all duration-300">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
@@ -125,7 +125,7 @@ export function CourseReviews({
               </CardTitle>
               <div className="flex gap-2">
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[140px] border-orange-200 dark:border-orange-800">
+                  <SelectTrigger className="w-[140px] border-0 bg-muted hover:bg-muted/80 transition-colors">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -139,13 +139,13 @@ export function CourseReviews({
           <CardContent className="space-y-6">
             {/* Write a Review */}
             {isLoggedIn && (
-              <div className="space-y-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="space-y-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
                 <Textarea
                   placeholder="Write your review..."
                   value={newComment}
                   onChange={(e) => onCommentChange(e.target.value)}
                   rows={3}
-                  className="resize-none border-orange-200 dark:border-orange-800 focus:border-orange-500 dark:focus:border-orange-500"
+                  className="resize-none border-0 bg-background focus:ring-2 focus:ring-orange-500/50 focus:ring-offset-2 transition-all"
                 />
                 <div className="flex justify-end">
                   <Button 
@@ -174,8 +174,8 @@ export function CourseReviews({
                     <div 
                       key={comment.id} 
                       className={cn(
-                        "p-4 rounded-lg border bg-card border-orange-200 dark:border-orange-800",
-                        "hover:shadow-md transition-all duration-200"
+                        "p-4 rounded-lg bg-card shadow-sm",
+                        "hover:shadow-lg hover:scale-[1.01] hover:bg-orange-50/50 dark:hover:bg-orange-900/10 transition-all duration-200"
                       )}
                     >
                       <div className="flex items-start gap-3">

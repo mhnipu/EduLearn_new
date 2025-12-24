@@ -47,7 +47,7 @@ export function CourseHeader({
   const navigate = useNavigate();
 
   return (
-    <div className="relative bg-gradient-to-br from-orange-500/10 via-background to-background border-b border-orange-200 dark:border-orange-800">
+    <div className="relative bg-gradient-to-br from-orange-500/10 via-background to-background">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         <BackButton 
           fallbackPath="/courses"
@@ -86,18 +86,18 @@ export function CourseHeader({
           {/* Stats Row */}
           <div className="flex flex-wrap items-center gap-4 md:gap-6">
             {averageRating > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 shadow-sm">
                 <Star className="h-5 w-5 fill-orange-500 text-orange-500" />
                 <span className="font-semibold text-orange-700 dark:text-orange-300">{averageRating.toFixed(1)}</span>
                 <span className="text-orange-600 dark:text-orange-400 text-sm">({totalRatings} ratings)</span>
               </div>
             )}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 shadow-sm text-orange-700 dark:text-orange-300">
               <Users className="h-4 w-4" />
               <span className="font-medium">{enrollmentCount} enrolled</span>
             </div>
             {course.estimated_duration_minutes && course.estimated_duration_minutes > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 shadow-sm text-orange-700 dark:text-orange-300">
                 <Clock className="h-4 w-4" />
                 <span className="font-medium">{Math.round(course.estimated_duration_minutes / 60)}h total</span>
               </div>
@@ -114,7 +114,7 @@ export function CourseHeader({
 
           {/* Progress Bar for enrolled */}
           {isEnrolled && totalItems > 0 && (
-            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800 max-w-xl">
+            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 shadow-sm max-w-xl">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">Your Progress</span>
                 <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">{completedCount}/{totalItems} completed</span>

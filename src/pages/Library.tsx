@@ -90,13 +90,17 @@ export default function Library() {
   const fetchBooks = async () => {
     setLoading(true);
     
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Library.tsx:fetchBooks',message:'Fetching books',data:{userId:user?.id,role,selectedCategory,searchQuery},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'O'})}).catch(()=>{});
+    // #endregion
+    
     // RLS policies will automatically filter books based on permissions
     // Only books with explicit permission will be visible
     // Super Admin sees all, others see only what they have permission for
+    // Note: Removed .eq('is_active', true) - RLS should handle all filtering
     let query = supabase
       .from('books')
-      .select('*')
-      .eq('is_active', true);
+      .select('*');
 
     if (selectedCategory !== 'all') {
       query = query.eq('category_id', selectedCategory);
@@ -107,6 +111,10 @@ export default function Library() {
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Library.tsx:fetchBooks',message:'Books fetch result',data:{booksCount:data?.length || 0,bookIds:data?.map(b=>b.id) || [],error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'O'})}).catch(()=>{});
+    // #endregion
     
     if (error) {
       console.error('Error fetching books:', error);
@@ -121,13 +129,17 @@ export default function Library() {
   const fetchVideos = async () => {
     setLoading(true);
     
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Library.tsx:fetchVideos',message:'Fetching videos',data:{userId:user?.id,role,selectedCategory,searchQuery},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'P'})}).catch(()=>{});
+    // #endregion
+    
     // RLS policies will automatically filter videos based on permissions
     // Only videos with explicit permission will be visible
     // Super Admin sees all, others see only what they have permission for
+    // Note: Removed .eq('is_active', true) - RLS should handle all filtering
     let query = supabase
       .from('videos')
-      .select('*')
-      .eq('is_active', true);
+      .select('*');
 
     if (selectedCategory !== 'all') {
       query = query.eq('category_id', selectedCategory);
@@ -138,6 +150,10 @@ export default function Library() {
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Library.tsx:fetchVideos',message:'Videos fetch result',data:{videosCount:data?.length || 0,videoIds:data?.map(v=>v.id) || [],error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'P'})}).catch(()=>{});
+    // #endregion
     
     if (error) {
       console.error('Error fetching videos:', error);

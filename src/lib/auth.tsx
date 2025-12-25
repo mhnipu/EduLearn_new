@@ -13,6 +13,7 @@ interface ModulePermission {
   can_delete: boolean;
   can_assign?: boolean;
   can_approve?: boolean;
+  source?: 'role' | 'user_override'; // Indicates if permission comes from role or user override
 }
 
 interface AuthContextType {
@@ -98,6 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         can_delete: p.can_delete || false,
         can_assign: p.can_assign || false,
         can_approve: p.can_approve || false,
+        source: p.source || 'role', // 'role' or 'user_override'
       }));
 
       setPermissions(modulePermissions);

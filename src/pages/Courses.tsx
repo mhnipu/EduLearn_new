@@ -84,11 +84,19 @@ export default function Courses() {
   const fetchCourses = async () => {
     setLoading(true);
     
-    // Fetch courses
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Courses.tsx:fetchCourses',message:'Fetching courses',data:{userId:user?.id,role},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'N'})}).catch(()=>{});
+    // #endregion
+    
+    // Fetch courses - RLS should filter to only assigned/enrolled courses
     const { data: coursesData, error } = await supabase
       .from('courses')
       .select('*')
       .order('created_at', { ascending: false });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Courses.tsx:fetchCourses',message:'Courses fetch result',data:{coursesCount:coursesData?.length || 0,courseIds:coursesData?.map(c=>c.id) || [],error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'N'})}).catch(()=>{});
+    // #endregion
 
     if (error) {
       console.error('Error fetching courses:', error);

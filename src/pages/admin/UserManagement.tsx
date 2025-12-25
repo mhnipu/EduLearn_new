@@ -62,7 +62,9 @@ import {
   User,
   AlertCircle,
   CheckCircle2,
-  Save
+  Save,
+  BookOpen,
+  Video
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -235,6 +237,31 @@ export default function UserManagement() {
   const [rolePermissionModuleSearch, setRolePermissionModuleSearch] = useState('');
   const [rolePermissionModuleFilter, setRolePermissionModuleFilter] = useState<string>('all');
 
+  // Content Assignment state
+  const [courses, setCourses] = useState<Array<{ id: string; title: string }>>([]);
+  const [books, setBooks] = useState<Array<{ id: string; title: string }>>([]);
+  const [videos, setVideos] = useState<Array<{ id: string; title: string }>>([]);
+  const [selectedContentForAssignment, setSelectedContentForAssignment] = useState<string>('');
+  const [selectedContentPerTab, setSelectedContentPerTab] = useState<{
+    courses: string;
+    books: string;
+    videos: string;
+  }>({ courses: '', books: '', videos: '' });
+  const [selectedUserForAssignment, setSelectedUserForAssignment] = useState<string>('');
+  const [selectedContentItems, setSelectedContentItems] = useState<string[]>([]); // For bulk assignment
+  const [contentAssignments, setContentAssignments] = useState<Array<{
+    id: string;
+    user_id: string;
+    assigned_at: string;
+    user_name?: string;
+    user_role?: string;
+  }>>([]);
+  const [contentAssignmentTab, setContentAssignmentTab] = useState<'courses' | 'books' | 'videos'>('courses');
+  const [isAssigningContent, setIsAssigningContent] = useState(false);
+  const [contentSearchQuery, setContentSearchQuery] = useState('');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
+
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
@@ -248,6 +275,23 @@ export default function UserManagement() {
       fetchData();
     }
   }, [user, role]);
+
+  useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:useEffect-selectedContent',message:'useEffect triggered',data:{selectedContent:selectedContentForAssignment,tab:contentAssignmentTab,hasBulkSelection:selectedContentItems.length > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'fix-tabs',hypothesisId:'J'})}).catch(()=>{});
+    // #endregion
+    
+    if (selectedContentForAssignment) {
+      fetchContentAssignments();
+    } else {
+      // Only clear assignments if we're not in the middle of a tab switch
+      // Check if there's a stored selection for this tab that we should restore
+      const storedSelection = selectedContentPerTab[contentAssignmentTab];
+      if (!storedSelection) {
+        setContentAssignments([]);
+      }
+    }
+  }, [selectedContentForAssignment, contentAssignmentTab]);
 
   // #region agent log
   useEffect(() => {
@@ -266,7 +310,7 @@ export default function UserManagement() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    await Promise.all([fetchUsers(), fetchModules(), fetchCustomRoles()]);
+    await Promise.all([fetchUsers(), fetchModules(), fetchCustomRoles(), fetchContentForAssignment()]);
     if (isSuperAdmin) {
       await fetchRolePermissions();
     }
@@ -377,6 +421,247 @@ export default function UserManagement() {
       });
     } finally {
       setIsCreatingRole(false);
+    }
+  };
+
+  const fetchContentForAssignment = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:fetchContentForAssignment',message:'Fetching content for assignment',data:{userId:user?.id,role},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    try {
+      const [coursesRes, booksRes, videosRes] = await Promise.all([
+        supabase.from('courses').select('id, title').order('title'),
+        supabase.from('books').select('id, title').eq('is_active', true).order('title'),
+        supabase.from('videos').select('id, title').eq('is_active', true).order('title'),
+      ]);
+
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:fetchContentForAssignment',message:'Content fetch results',data:{coursesCount:coursesRes.data?.length || 0,booksCount:booksRes.data?.length || 0,videosCount:videosRes.data?.length || 0,coursesError:coursesRes.error?.message,booksError:booksRes.error?.message,videosError:videosRes.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+
+      if (coursesRes.data) setCourses(coursesRes.data);
+      if (booksRes.data) setBooks(booksRes.data);
+      if (videosRes.data) setVideos(videosRes.data);
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:fetchContentForAssignment',message:'Error fetching content',data:{error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      console.error('Error fetching content for assignment:', error);
+    }
+  };
+
+  const fetchContentAssignments = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:fetchContentAssignments',message:'Fetching assignments',data:{selectedContent:selectedContentForAssignment,tab:contentAssignmentTab},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+
+    if (!selectedContentForAssignment) {
+      setContentAssignments([]);
+      return;
+    }
+
+    try {
+      let data: any[] | null = null;
+      let error = null;
+
+      if (contentAssignmentTab === 'courses') {
+        const res = await supabase
+          .from('course_assignments')
+          .select('*')
+          .eq('course_id', selectedContentForAssignment);
+        data = res.data;
+        error = res.error;
+      } else if (contentAssignmentTab === 'books') {
+        const res = await supabase
+          .from('book_assignments')
+          .select('*')
+          .eq('book_id', selectedContentForAssignment);
+        data = res.data;
+        error = res.error;
+      } else {
+        const res = await supabase
+          .from('video_assignments')
+          .select('*')
+          .eq('video_id', selectedContentForAssignment);
+        data = res.data;
+        error = res.error;
+      }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:fetchContentAssignments',message:'Assignment fetch result',data:{dataCount:data?.length || 0,error:error?.message,errorCode:error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
+
+      if (error) {
+        console.error('Error fetching assignments:', error);
+        return;
+      }
+
+      // Enrich with user info
+      const enrichedAssignments = (data || []).map(a => {
+        const userInfo = users.find(u => u.id === a.user_id);
+        return {
+          ...a,
+          user_name: userInfo?.full_name || 'Unknown User',
+          user_role: userInfo?.roles?.[0] || 'unknown'
+        };
+      });
+
+      setContentAssignments(enrichedAssignments);
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:fetchContentAssignments',message:'Exception in fetch assignments',data:{error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
+      console.error('Error fetching content assignments:', error);
+    } finally {
+      setIsLoadingAssignments(false);
+    }
+  };
+
+  const handleAssignContent = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:handleAssignContent',message:'Assignment attempt started',data:{selectedContent:selectedContentForAssignment,selectedUser:selectedUserForAssignment,tab:contentAssignmentTab,userId:user?.id,selectedItemsCount:selectedContentItems.length},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
+    // Support both single and bulk assignment
+    const itemsToAssign = selectedContentItems.length > 0 ? selectedContentItems : (selectedContentForAssignment ? [selectedContentForAssignment] : []);
+    
+    if (itemsToAssign.length === 0 || !selectedUserForAssignment) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:handleAssignContent',message:'Validation failed',data:{itemsCount:itemsToAssign.length,hasUser:!!selectedUserForAssignment},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      toast({ title: 'Please select content and user', variant: 'destructive' });
+      return;
+    }
+
+    setIsAssigningContent(true);
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:handleAssignContent',message:'Starting bulk insert',data:{itemsCount:itemsToAssign.length,tab:contentAssignmentTab},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+
+      // Prepare bulk insert data
+      const insertData = itemsToAssign.map(itemId => {
+        if (contentAssignmentTab === 'courses') {
+          return {
+            course_id: itemId,
+            user_id: selectedUserForAssignment,
+            assigned_by: user!.id,
+          };
+        } else if (contentAssignmentTab === 'books') {
+          return {
+            book_id: itemId,
+            user_id: selectedUserForAssignment,
+            assigned_by: user!.id,
+          };
+        } else {
+          return {
+            video_id: itemId,
+            user_id: selectedUserForAssignment,
+            assigned_by: user!.id,
+          };
+        }
+      });
+
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:handleAssignContent',message:'Insert data prepared',data:{insertCount:insertData.length,firstItem:insertData[0]},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+
+      let result;
+      if (contentAssignmentTab === 'courses') {
+        result = await supabase.from('course_assignments').insert(insertData);
+      } else if (contentAssignmentTab === 'books') {
+        result = await supabase.from('book_assignments').insert(insertData);
+      } else {
+        result = await supabase.from('video_assignments').insert(insertData);
+      }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:handleAssignContent',message:'Insert result',data:{error:result.error?.message,errorCode:result.error?.code,errorDetails:result.error?.details,dataCount:result.data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+
+      if (result.error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:handleAssignContent',message:'Insert error occurred',data:{errorMessage:result.error.message,errorCode:result.error.code,errorHint:result.error.hint,errorDetails:result.error.details},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+
+        if (result.error.code === '23505') {
+          toast({ title: 'One or more users already assigned to this content', variant: 'destructive' });
+        } else {
+          toast({ 
+            title: 'Failed to assign', 
+            description: result.error.message || 'Unknown error occurred',
+            variant: 'destructive' 
+          });
+        }
+        errorCount = itemsToAssign.length;
+      } else {
+        successCount = itemsToAssign.length;
+        toast({ 
+          title: 'Content assigned successfully!', 
+          description: `${successCount} item(s) assigned` 
+        });
+        setSelectedUserForAssignment('');
+        setSelectedContentItems([]);
+        setSelectedContentForAssignment('');
+        await fetchContentAssignments();
+      }
+    } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:handleAssignContent',message:'Exception caught',data:{error:err instanceof Error ? err.message : String(err),stack:err instanceof Error ? err.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      console.error('Error assigning content:', err);
+      toast({ title: 'Failed to assign content', variant: 'destructive' });
+    } finally {
+      setIsAssigningContent(false);
+    }
+  };
+
+  const handleRemoveContentAssignment = async (assignmentId: string) => {
+    try {
+      let error = null;
+
+      if (contentAssignmentTab === 'courses') {
+        const { error: err } = await supabase
+          .from('course_assignments')
+          .delete()
+          .eq('id', assignmentId);
+        error = err;
+      } else if (contentAssignmentTab === 'books') {
+        const { error: err } = await supabase
+          .from('book_assignments')
+          .delete()
+          .eq('id', assignmentId);
+        error = err;
+      } else {
+        const { error: err } = await supabase
+          .from('video_assignments')
+          .delete()
+          .eq('id', assignmentId);
+        error = err;
+      }
+
+      if (error) {
+        toast({ title: 'Failed to remove assignment', variant: 'destructive' });
+      } else {
+        toast({ title: 'Assignment removed' });
+        await fetchContentAssignments();
+      }
+    } catch (error) {
+      console.error('Error removing assignment:', error);
+      toast({ title: 'Failed to remove assignment', variant: 'destructive' });
+    }
+  };
+
+  const getContentOptions = () => {
+    switch (contentAssignmentTab) {
+      case 'courses': return courses;
+      case 'books': return books;
+      case 'videos': return videos;
+      default: return [];
     }
   };
 
@@ -943,6 +1228,10 @@ export default function UserManagement() {
             <TabsTrigger value="users" className="flex items-center gap-2 data-[state=active]:bg-background">
               <Users className="h-4 w-4" />
               Users & Roles
+            </TabsTrigger>
+            <TabsTrigger value="content-assignments" className="flex items-center gap-2 data-[state=active]:bg-background">
+              <Boxes className="h-4 w-4" />
+              Content Assignments
             </TabsTrigger>
             {/* Permissions Matrix - Super Admin Only */}
             {isSuperAdmin && (
@@ -1666,6 +1955,395 @@ export default function UserManagement() {
             </Card>
           </TabsContent>
           )}
+
+          {/* Content Assignments Tab */}
+          <TabsContent value="content-assignments">
+            <div className="space-y-6">
+              {/* Header with Stats */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card className="border-border bg-gradient-to-br from-primary/5 to-primary/10">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Courses</p>
+                        <p className="text-2xl font-bold mt-1">{courses.length}</p>
+                      </div>
+                      <BookOpen className="h-8 w-8 text-primary/60" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border bg-gradient-to-br from-chart-2/5 to-chart-2/10">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Books</p>
+                        <p className="text-2xl font-bold mt-1">{books.length}</p>
+                      </div>
+                      <BookOpen className="h-8 w-8 text-chart-2/60" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border bg-gradient-to-br from-chart-3/5 to-chart-3/10">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Videos</p>
+                        <p className="text-2xl font-bold mt-1">{videos.length}</p>
+                      </div>
+                      <Video className="h-8 w-8 text-chart-3/60" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border bg-gradient-to-br from-chart-4/5 to-chart-4/10">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Active Assignments</p>
+                        <p className="text-2xl font-bold mt-1">{contentAssignments.length}</p>
+                      </div>
+                      <Users className="h-8 w-8 text-chart-4/60" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="border-border">
+                <CardHeader className="border-b border-border">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Boxes className="h-5 w-5 text-primary" />
+                          Content Assignments
+                        </CardTitle>
+                        <CardDescription className="mt-2">
+                          Assign courses, books, and videos to users. Users will only see content they are assigned to.
+                        </CardDescription>
+                      </div>
+                      <Button onClick={fetchContentForAssignment} variant="outline" size="sm" className="gap-2">
+                        <RefreshCw className="h-4 w-4" />
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+              <CardContent className="pt-6">
+                <Tabs value={contentAssignmentTab} onValueChange={(v) => { 
+                  const newTab = v as 'courses' | 'books' | 'videos';
+                  
+                  // #region agent log
+                  fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:tabChange',message:'Tab changed',data:{oldTab:contentAssignmentTab,newTab:v,currentSelected:selectedContentForAssignment,storedForOldTab:selectedContentPerTab[contentAssignmentTab],storedForNewTab:selectedContentPerTab[newTab],assignmentsCount:contentAssignments.length},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H'})}).catch(()=>{});
+                  // #endregion
+                  
+                  // Save current selection for the old tab
+                  const currentSelection = selectedContentForAssignment;
+                  setSelectedContentPerTab(prev => ({
+                    ...prev,
+                    [contentAssignmentTab]: currentSelection
+                  }));
+                  
+                  // Get the stored selection for the new tab BEFORE updating state
+                  const restoredSelection = selectedContentPerTab[newTab] || '';
+                  
+                  // Switch to new tab
+                  setContentAssignmentTab(newTab);
+                  setSelectedContentItems([]);
+                  
+                  // Restore selection for the new tab
+                  if (restoredSelection) {
+                    // Set the selection - useEffect will handle fetching
+                    setSelectedContentForAssignment(restoredSelection);
+                  } else {
+                    setSelectedContentForAssignment('');
+                    // Only clear if there's no stored selection
+                    setContentAssignments([]);
+                  }
+                }}>
+                  <TabsList className="mb-6">
+                    <TabsTrigger value="courses">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Courses
+                    </TabsTrigger>
+                    <TabsTrigger value="books">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Books
+                    </TabsTrigger>
+                    <TabsTrigger value="videos">
+                      <Video className="mr-2 h-4 w-4" />
+                      Videos
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value={contentAssignmentTab}>
+                    <div className="grid lg:grid-cols-2 gap-6">
+                      {/* Assignment Form */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Assign {contentAssignmentTab.slice(0, -1)}</CardTitle>
+                          <CardDescription>
+                            Select content and assign it to users
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="text-sm font-medium">
+                                Select {contentAssignmentTab.slice(0, -1)}{selectedContentItems.length > 0 ? ` (${selectedContentItems.length} selected)` : ''}
+                              </label>
+                              {selectedContentItems.length > 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedContentItems([]);
+                                    setSelectedContentForAssignment('');
+                                  }}
+                                  className="h-6 text-xs"
+                                >
+                                  Clear Selection
+                                </Button>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Select 
+                                value={selectedContentForAssignment} 
+                                onValueChange={(value) => {
+                                  // #region agent log
+                                  fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserManagement.tsx:contentSelect',message:'Content selected',data:{value,tab:contentAssignmentTab,previousContent:selectedContentForAssignment},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'I'})}).catch(()=>{});
+                                  // #endregion
+                                  // Update stored selection for this tab FIRST, then update current selection
+                                  setSelectedContentPerTab(prev => ({
+                                    ...prev,
+                                    [contentAssignmentTab]: value
+                                  }));
+                                  setSelectedContentForAssignment(value);
+                                  // Clear bulk selection when single select is used
+                                  if (value) {
+                                    setSelectedContentItems([]);
+                                    // Clear assignments first, then fetch new ones
+                                    setContentAssignments([]);
+                                    // Trigger fetch after a short delay to ensure state is updated
+                                    setTimeout(() => fetchContentAssignments(), 100);
+                                  } else {
+                                    // Clear assignments when content is deselected
+                                    setContentAssignments([]);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={`Choose a ${contentAssignmentTab.slice(0, -1)}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {getContentOptions().map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                      {item.title}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1.5 px-1">
+                                <span className="font-medium text-foreground/70">OR</span>
+                                <span>select multiple items below for bulk assignment</span>
+                              </div>
+                              <ScrollArea className="h-[200px] border rounded-md p-2">
+                                <div className="space-y-2">
+                                  {getContentOptions().map((item) => {
+                                    const isSelected = selectedContentItems.includes(item.id);
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        className={`flex items-center space-x-2 p-2 rounded-md cursor-pointer hover:bg-muted transition-colors ${
+                                          isSelected ? 'bg-primary/10 border border-primary' : ''
+                                        }`}
+                                        onClick={() => {
+                                          if (isSelected) {
+                                            setSelectedContentItems(prev => prev.filter(id => id !== item.id));
+                                          } else {
+                                            setSelectedContentItems(prev => [...prev, item.id]);
+                                            setSelectedContentForAssignment(''); // Clear single select
+                                          }
+                                        }}
+                                      >
+                                        <Checkbox
+                                          checked={isSelected}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) {
+                                              setSelectedContentItems(prev => [...prev, item.id]);
+                                              setSelectedContentForAssignment('');
+                                            } else {
+                                              setSelectedContentItems(prev => prev.filter(id => id !== item.id));
+                                            }
+                                          }}
+                                        />
+                                        <span className="text-sm flex-1">{item.title}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Select User</label>
+                            <Select value={selectedUserForAssignment} onValueChange={setSelectedUserForAssignment}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose a user" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {users.filter(u => u.roles.length > 0 && !u.roles.includes('super_admin') && !u.roles.includes('admin')).map((u) => (
+                                  <SelectItem key={u.id} value={u.id}>
+                                    {u.full_name || 'No Name'} ({u.roles.join(', ')})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <Button 
+                            onClick={handleAssignContent} 
+                            disabled={(!selectedContentForAssignment && selectedContentItems.length === 0) || !selectedUserForAssignment || isAssigningContent}
+                            className="w-full"
+                          >
+                            {isAssigningContent ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Plus className="mr-2 h-4 w-4" />
+                            )}
+                            {selectedContentItems.length > 0 
+                              ? `Assign ${selectedContentItems.length} Item(s) to User`
+                              : 'Assign to User'}
+                          </Button>
+                        </CardContent>
+                      </Card>
+
+                      {/* Current Assignments */}
+                      <Card className="border-border shadow-sm">
+                        <CardHeader className="bg-muted/30 border-b">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="flex items-center gap-2">
+                                <Users className="h-5 w-5 text-primary" />
+                                Current Assignments
+                                {contentAssignments.length > 0 && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    {contentAssignments.length}
+                                  </Badge>
+                                )}
+                              </CardTitle>
+                              <CardDescription className="mt-1">
+                                {selectedContentForAssignment 
+                                  ? `Users assigned to this ${contentAssignmentTab.slice(0, -1)}`
+                                  : selectedContentItems.length > 0
+                                  ? `${selectedContentItems.length} item(s) selected for bulk assignment`
+                                  : `Select a ${contentAssignmentTab.slice(0, -1)} to view assignments`}
+                              </CardDescription>
+                            </div>
+                            {(selectedContentForAssignment || selectedContentItems.length > 0) && contentAssignments.length > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={fetchContentAssignments}
+                                      className="h-8 w-8"
+                                    >
+                                      <RefreshCw className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Refresh assignments</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          {!selectedContentForAssignment && selectedContentItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <Boxes className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                              <p className="text-muted-foreground font-medium">
+                                Select a {contentAssignmentTab.slice(0, -1)} to view assignments
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Choose from the dropdown above or select multiple items below for bulk assignment
+                              </p>
+                            </div>
+                          ) : isLoadingAssignments ? (
+                            <div className="flex flex-col items-center justify-center py-12">
+                              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                              <p className="text-sm text-muted-foreground">Loading assignments...</p>
+                            </div>
+                          ) : contentAssignments.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <Users className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                              <p className="text-muted-foreground font-medium">
+                                No users assigned yet
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Assign this {contentAssignmentTab.slice(0, -1)} to users using the form on the left
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {contentAssignments.map((a) => {
+                                const assignedDate = new Date(a.assigned_at);
+                                return (
+                                  <div
+                                    key={a.id}
+                                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors group"
+                                  >
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <div className="flex-shrink-0">
+                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                          <User className="h-5 w-5 text-primary" />
+                                        </div>
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate">{a.user_name}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <Badge variant="outline" className="text-xs">
+                                            {a.user_role}
+                                          </Badge>
+                                          <span className="text-xs text-muted-foreground">
+                                            Assigned {assignedDate.toLocaleDateString()}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleRemoveContentAssignment(a.id)}
+                                            className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Remove assignment</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+            </div>
+          </TabsContent>
         </Tabs>
 
         {/* Permissions Dialog - Read Only (Effective Permissions from Roles) */}

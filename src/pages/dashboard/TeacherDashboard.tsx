@@ -153,12 +153,18 @@ const TeacherDashboard = () => {
     try {
       setLoadingData(true);
       
-      // Fetch teacher's created courses (direct query - should work via RLS)
+      // Fetch teacher's courses - RLS will filter to only assigned/created courses
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeacherDashboard.tsx:fetchTeacherData',message:'Fetching courses',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'K'})}).catch(()=>{});
+      // #endregion
       const { data: createdCourses, error: createdError } = await supabase
         .from('courses')
         .select('*')
-        .eq('created_by', user?.id)
         .order('created_at', { ascending: false });
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeacherDashboard.tsx:fetchTeacherData',message:'Courses fetch result',data:{coursesCount:createdCourses?.length || 0,error:createdError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'K'})}).catch(()=>{});
+      // #endregion
 
       if (createdError) {
         console.error('Error fetching created courses:', createdError);
@@ -189,14 +195,16 @@ const TeacherDashboard = () => {
       }));
 
       // Combine and deduplicate courses
+      // Note: RLS already filters courses, so createdCourses includes both created AND assigned courses
       const coursesMap = new Map<string, Course>();
       
-      // Add created courses
+      // Add courses from RLS-filtered query (includes both created and assigned)
       (createdCourses || []).forEach((course: any) => {
         coursesMap.set(course.id, course);
       });
       
-      // Add assigned courses (only if not already in map)
+      // Also add assigned courses from RPC (for additional metadata if needed)
+      // But RLS should have already included them in createdCourses
       normalizedAssignedCourses.forEach((course: any) => {
         if (!coursesMap.has(course.id)) {
           coursesMap.set(course.id, course);
@@ -386,21 +394,28 @@ const TeacherDashboard = () => {
   const fetchLibraryContents = async () => {
     setLibraryLoading(true);
     try {
-      // Fetch all active books and videos (teacher has access to all active items)
+      // Fetch books and videos - RLS will automatically filter by teacher's assigned courses
+      // Teacher can access libraries linked to their assigned courses via has_book_access() and has_video_access()
+      // RLS will automatically filter to only accessible books/videos
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeacherDashboard.tsx:fetchLibraryContents',message:'Fetching library content',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'L'})}).catch(()=>{});
+      // #endregion
       const [booksRes, videosRes] = await Promise.all([
         supabase
           .from('books')
           .select('id, title, thumbnail_url, author')
-          .eq('is_active', true)
           .limit(12)
           .order('created_at', { ascending: false }),
         supabase
           .from('videos')
           .select('id, title, thumbnail_url, duration_minutes')
-          .eq('is_active', true)
           .limit(12)
           .order('created_at', { ascending: false })
       ]);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeacherDashboard.tsx:fetchLibraryContents',message:'Library fetch result',data:{booksCount:booksRes.data?.length || 0,videosCount:videosRes.data?.length || 0,booksError:booksRes.error?.message,videosError:videosRes.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'L'})}).catch(()=>{});
+      // #endregion
 
       const libraryItemsList: LibraryItem[] = [];
 

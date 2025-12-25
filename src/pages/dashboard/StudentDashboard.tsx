@@ -527,21 +527,27 @@ const StudentDashboard = () => {
   const fetchLibraryContents = async () => {
     setLibraryLoading(true);
     try {
-      // Fetch recent/active books and videos
+      // Fetch books and videos - RLS will automatically filter by student's enrollments
+      // Student can access libraries assigned directly or linked to enrolled courses via has_book_access() and has_video_access()
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentDashboard.tsx:fetchLibraryContents',message:'Fetching library content',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'M'})}).catch(()=>{});
+      // #endregion
       const [booksRes, videosRes] = await Promise.all([
         supabase
           .from('books')
           .select('id, title, thumbnail_url, author')
-          .eq('is_active', true)
           .limit(12)
           .order('created_at', { ascending: false }),
         supabase
           .from('videos')
           .select('id, title, thumbnail_url, duration_minutes')
-          .eq('is_active', true)
           .limit(12)
           .order('created_at', { ascending: false })
       ]);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/81561616-f42a-458a-bfc3-302d8c75cd9a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StudentDashboard.tsx:fetchLibraryContents',message:'Library fetch result',data:{booksCount:booksRes.data?.length || 0,videosCount:videosRes.data?.length || 0,booksError:booksRes.error?.message,videosError:videosRes.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'visibility-fix',hypothesisId:'M'})}).catch(()=>{});
+      // #endregion
 
       const libraryItemsList: LibraryItem[] = [];
 

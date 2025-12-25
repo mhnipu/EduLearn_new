@@ -41,6 +41,7 @@ import AssignmentManagement from "./pages/admin/AssignmentManagement";
 import AssignmentSubmissions from "./pages/admin/AssignmentSubmissions";
 import SiteContent from "./pages/admin/SiteContent";
 import LandingPageCMS from "./pages/admin/LandingPageCMS";
+import UserPermissionManagement from "./pages/admin/UserPermissionManagement";
 import StudentAssignments from "./pages/student/StudentAssignments";
 import QuizExamTaking from "./pages/student/QuizExamTaking";
 import ProfileCompletion from "./pages/ProfileCompletion";
@@ -207,6 +208,14 @@ const App = () => (
                   requiredPermission={{ module: 'analytics', action: 'read' }}
                 >
                   <SystemMonitoring />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/user-permissions" element={
+                <ProtectedRoute 
+                  allowRoles={['super_admin', 'admin']}
+                  requiredPermission={{ module: 'users', action: 'update' }}
+                >
+                  <UserPermissionManagement />
                 </ProtectedRoute>
               } />
               <Route path="/admin/enrollments" element={
